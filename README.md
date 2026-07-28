@@ -48,7 +48,7 @@ Offline-capable **Qt 6 / QtWebEngine** wrapper for [SingularityApp](https://web.
 >   function`) before service worker registration. If you tune the stub
 >   (P-1 in docs/phase0.md), keep the recursive shape.
 
-## How it works (60 seconds)
+## How it works
 
 The vendor's own Electron client runs the whole app on a privileged custom
 origin `sg://renderer` served from local files. This shell replicates exactly
@@ -57,7 +57,7 @@ origin is always "online" because it comes from disk, so **cold start works
 offline**; sync and auth go cross-origin to the vendor's cloud (their API
 answers `Access-Control-Allow-Origin: *`) exactly as in the official client.
 
-- Baseline assets ship **in the RPM** at `/usr/share/singularity-shell/` →
+- Baseline assets may be shipped at `/usr/share/singularity-shell/` →
   first launch works offline out of the box.
 - A **silent background updater** checks the Snap Store once a day, downloads
   newer assets into `$XDG_DATA_HOME/singularity-shell/assets/` (SHA3-384
@@ -80,15 +80,6 @@ answers `Access-Control-Allow-Origin: *`) exactly as in the official client.
 cmake -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build -j$(nproc)
 ./build/singularity-shell
-```
-
-## RPM
-
-```bash
-# source tarball of this tree expected in ~/rpmbuild/SOURCES
-rpmbuild -ba packaging/singularity-shell.spec
-# offline build host: place singularityapp.snap in SOURCES and use
-#   rpmbuild -ba --with offline_assets packaging/singularity-shell.spec
 ```
 
 ## CLI
