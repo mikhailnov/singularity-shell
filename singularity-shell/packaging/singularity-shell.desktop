@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Singularity
+Comment=Offline-capable QtWebEngine wrapper for SingularityApp
+Exec=singularity-shell
+Icon=singularity-shell
+Categories=Office;Utility;
+StartupWMClass=singularity-shell
+Terminal=false

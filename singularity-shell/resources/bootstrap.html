@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Singularity — first run</title>
+<style>
+  body { font-family: system-ui, sans-serif; background:#0b0e1a; color:#e8e8f0;
+         display:flex; align-items:center; justify-content:center; height:100vh;
+         margin:0; }
+  .card { max-width:460px; padding:32px 40px; background:#151a2e;
+          border-radius:12px; box-shadow:0 8px 30px rgba(0,0,0,.4); }
+  h1 { font-size:20px; margin:0 0 12px; }
+  p  { color:#a8aec4; line-height:1.5; }
+  #status { margin-top:16px; font-weight:600; color:#7ec8ff; }
+</style>
+</head>
+<body>
+  <div class="card">
+    <h1>Downloading Singularity…</h1>
+    <p>The application assets were not found on this system. They are being
+       downloaded from the official Snap Store right now (one-time, ~43&nbsp;MB
+       extracted). Next launches will work fully offline.</p>
+    <div id="status">Connecting…</div>
+  </div>
+</body>
+</html>
