@@ -22,7 +22,7 @@
 
 ## Установка
 
-### ROSA Linux
+### ROSA Linux, МОС, МосТех.ОС
 
 На Росе 13+: `sudo dnf install singularity-shell`  
 (Роса Фреш, Роса Хром)

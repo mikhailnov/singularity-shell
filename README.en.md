@@ -22,7 +22,7 @@ The offline javascript version from the Snap package is reused.
 
 ## Installation
 
-### ROSA Linux
+### ROSA Linux, MOS/MosTech.OS
 
 On ROSA 13+: `sudo dnf install singularity-shell`
 
