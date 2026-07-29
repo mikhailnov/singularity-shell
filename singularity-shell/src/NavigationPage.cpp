@@ -53,11 +53,9 @@ bool NavigationPage::acceptNavigationRequest(const QUrl& url, NavigationType typ
     if (isVendorHost(url.host()))
         return true;
 
-    if (type == NavigationTypeLinkClicked && isMainFrame) {
-        emit externalUrlRequested(url);
-        return false;
-    }
-    return true;
+    // Everything else: open in the system browser, regardless of frame type.
+    emit externalUrlRequested(url);
+    return false;
 }
 
 QWebEnginePage* NavigationPage::createWindow(WebWindowType type)
