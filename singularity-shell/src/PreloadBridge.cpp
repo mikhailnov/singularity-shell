@@ -56,23 +56,20 @@ void PreloadBridge::openExternal(const QString& url)
 {
     emit externalOpenRequested(QUrl(url));
 }
-
 void PreloadBridge::installOn(QWebEnginePage* page)
 {
-    auto* view = qobject_cast<QWebEngineView*>(page->parent());
-
-    // Connect this page's view to bridge signals so each page closes/minimizes
-    // independently. Qt::UniqueConnection avoids duplicates if called multiple
-    // times for the same page.
-    if (view) {
-        connect(this, &PreloadBridge::minimizeRequested, view, &QWidget::showMinimized, Qt::UniqueConnection);
+    // Connect this page's view to bridge signals. Each bridge instance is
+    // created per-page (main window gets one, each popup gets its own), so
+    // signals never cross-contaminate between windows.
+    if (auto* view = qobject_cast<QWebEngineView*>(page->parent())) {
+        connect(this, &PreloadBridge::minimizeRequested, view, &QWidget::showMinimized);
         connect(this, &PreloadBridge::maximizeToggleRequested, view, [view] {
             view->setWindowState(view->windowState() ^ Qt::WindowMaximized);
-        }, Qt::UniqueConnection);
-        connect(this, &PreloadBridge::closeRequested, view, &QWidget::close, Qt::UniqueConnection);
+        });
+        connect(this, &PreloadBridge::closeRequested, view, &QWidget::close);
     }
     connect(this, &PreloadBridge::externalOpenRequested, this,
-            [](const QUrl& u) { QDesktopServices::openUrl(u); }, Qt::UniqueConnection);
+            [](const QUrl& u) { QDesktopServices::openUrl(u); });
 
     // 1) WebChannel with this object.
     auto* channel = new QWebChannel(page);

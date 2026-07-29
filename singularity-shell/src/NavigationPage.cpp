@@ -62,18 +62,22 @@ QWebEnginePage* NavigationPage::createWindow(WebWindowType type)
     view->resize(1024, 768);
 
     auto* page = new NavigationPage(profile(), /*permissivePopups=*/true,
-                                    m_bridge, view);
+                                    /*bridge=*/nullptr, view);
     view->setPage(page);
 
-    // Install the bridge so window.preloadApi is available in the new window.
-    if (m_bridge)
-        m_bridge->installOn(page);
+    // Each window gets its own PreloadBridge so signals (close/minimize/maximize)
+    // are scoped to that window alone. The bridge is parented to the view so it
+    // lives exactly as long as the window.
+    auto* popupBridge = new PreloadBridge(view);
+    popupBridge->setVersions(m_bridge ? m_bridge->appVersion() : QString(),
+                             m_bridge ? m_bridge->assetVersion() : QString());
+    popupBridge->installOn(page);
 
     QObject::connect(page, &QWebEnginePage::windowCloseRequested,
                      view, &QWidget::close);
     view->setWindowTitle(tr("Singularity — new window"));
     view->show();
-    qCDebug(lcNav) << "popup/new-window opened";
+    qCDebug(lcNav) << "new window opened";
     return page;
 }
 
