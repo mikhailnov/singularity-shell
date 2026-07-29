@@ -42,9 +42,10 @@ MainWindow::MainWindow(QWebEngineProfile* profile, PreloadBridge* bridge,
         bridge->installOn(m_page);
 
     // Non-intrusive update indicator in the status bar (FR-9: no popups).
+    // Hidden by default — only shown when there's text to display.
     m_updateStatus = new QLabel(this);
-    m_updateStatus->setVisible(false);
     statusBar()->addPermanentWidget(m_updateStatus);
+    statusBar()->hide();
 
     // Zoom shortcuts.
     auto addZoomShortcut = [this](const QKeySequence& seq, double delta) {
@@ -90,7 +91,7 @@ void MainWindow::loadBootstrap()
 void MainWindow::setUpdateStatus(const QString& text)
 {
     m_updateStatus->setText(text);
-    m_updateStatus->setVisible(!text.isEmpty());
+    statusBar()->setVisible(!text.isEmpty());
 
     // Bootstrap page progress (FR-10): forward to the page if it is showing.
     // Use JSON.stringify for safe JS string escaping — never concatenate

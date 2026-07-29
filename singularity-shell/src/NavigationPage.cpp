@@ -1,11 +1,16 @@
 #include "NavigationPage.h"
 #include "PreloadBridge.h"
 
+#include <QAction>
+#include <QKeySequence>
+#include <QLoggingCategory>
+#include <QMainWindow>
+#include <QMenu>
+#include <QMenuBar>
+#include <QStatusBar>
 #include <QWebEngineCertificateError>
 #include <QWebEngineProfile>
 #include <QWebEngineView>
-#include <QLoggingCategory>
-
 Q_LOGGING_CATEGORY(lcNav, "shell.nav")
 
 NavigationPage::NavigationPage(QWebEngineProfile* profile, bool permissivePopups,
@@ -57,26 +62,33 @@ bool NavigationPage::acceptNavigationRequest(const QUrl& url, NavigationType typ
 QWebEnginePage* NavigationPage::createWindow(WebWindowType type)
 {
     Q_UNUSED(type);
-    auto* view = new QWebEngineView;
-    view->setAttribute(Qt::WA_DeleteOnClose);
-    view->resize(1024, 768);
+    // Wrap in QMainWindow for menu bar; no status bar (always hidden).
+    auto* win = new QMainWindow;
+    win->setAttribute(Qt::WA_DeleteOnClose);
+    win->resize(1024, 768);
+    win->statusBar()->hide();
 
+    // "File" menu matching the main window.
+    QMenu* menu = win->menuBar()->addMenu(tr("&File"));
+    QAction* quit = menu->addAction(tr("&Quit"), win, &QWidget::close);
+    quit->setShortcut(QKeySequence::Quit);
+
+    auto* view = new QWebEngineView(win);
     auto* page = new NavigationPage(profile(), /*permissivePopups=*/true,
                                     /*bridge=*/nullptr, view);
     view->setPage(page);
+    win->setCentralWidget(view);
 
-    // Each window gets its own PreloadBridge so signals (close/minimize/maximize)
-    // are scoped to that window alone. The bridge is parented to the view so it
-    // lives exactly as long as the window.
+    // Each window gets its own PreloadBridge.
     auto* popupBridge = new PreloadBridge(view);
     popupBridge->setVersions(m_bridge ? m_bridge->appVersion() : QString(),
                              m_bridge ? m_bridge->assetVersion() : QString());
     popupBridge->installOn(page);
 
     QObject::connect(page, &QWebEnginePage::windowCloseRequested,
-                     view, &QWidget::close);
-    view->setWindowTitle(tr("Singularity — new window"));
-    view->show();
+                     win, &QWidget::close);
+    win->setWindowTitle(tr("Singularity — new window"));
+    win->show();
     qCDebug(lcNav) << "new window opened";
     return page;
 }
