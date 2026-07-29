@@ -102,12 +102,9 @@ void MainWindow::buildMenus()
         zoomLabel->setText(QStringLiteral("%1 %").arg(qRound(m_page->zoomFactor() * 100)));
     });
     viewMenu->addSeparator();
-    viewMenu->addAction(tr("Zoom &In"), this, [this] { setZoom(m_page->zoomFactor() + 0.1); },
-                        QKeySequence::ZoomIn);
-    viewMenu->addAction(tr("Zoom &Out"), this, [this] { setZoom(m_page->zoomFactor() - 0.1); },
-                        QKeySequence::ZoomOut);
-    viewMenu->addAction(tr("&Reset"), this, [this] { setZoom(1.0); },
-                        QKeySequence(QStringLiteral("Ctrl+0")));
+    viewMenu->addAction(tr("Zoom &In"), QKeySequence::ZoomIn, this, [this] { setZoom(m_page->zoomFactor() + 0.1); });
+    viewMenu->addAction(tr("Zoom &Out"), QKeySequence::ZoomOut, this, [this] { setZoom(m_page->zoomFactor() - 0.1); });
+    viewMenu->addAction(tr("&Reset"), QKeySequence(QStringLiteral("Ctrl+0")), this, [this] { setZoom(1.0); });
 }
 
 void MainWindow::setZoom(double factor)
