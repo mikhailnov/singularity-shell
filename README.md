@@ -1,7 +1,12 @@
 # singularity-shell
 
-Offline-capable **Qt 6 / QtWebEngine** wrapper for [SingularityApp](https://web.singularity-app.com/)
-— no snapd, no third-party browser binaries.
+Неофициальное десктопное приложение менеджера задач [Singularity](https://singularity-app.ru/) на **QtWebEngine**.
+
+Их официальное приложение сделано на Electron и доступно только через магазин Snap.
+
+Это же неофициальное приложение использует системный QtWebEngine, может быть собрано из исходников и установлено из репозитория дистрибутива.
+
+Переиспользуется оффлайн-версия на javascript из snap-пакета. 
 
 ![Inbox](docs/img-ru/inbox.png)
 
@@ -15,83 +20,92 @@ Offline-capable **Qt 6 / QtWebEngine** wrapper for [SingularityApp](https://web.
 
 ![Diagnostics menu](docs/img-ru/menu-diagnostics.png)
 
-Tested on **ROSA Fresh 13.2, Qt 6.11.1**. Validated:
+## Установка
 
-- offline **cold start**: full UI renders from local assets, no network needed;
-- cloud API transport and **real login** work end-to-end;
-- **service worker** self-registers on `sg://renderer`, IndexedDB persists
-  across restarts (`AppDatabase`, `SingularityLogs3`);
-- **background updater**: Snap Store check, download, SHA3-384 verify, stage;
-- asset pipeline: `asar-extract` + `fetch-assets.sh` byte-identical extraction;
-- **Russian translation** (Qt Linguist) via `QTranslator`.
+### ROSA Linux
 
-## How it works
+На Росе 13+: `sudo dnf install singularity-shell`  
+(Роса Фреш, Роса Хром)
 
-The vendor's own Electron client runs the whole app on a privileged custom
-origin `sg://renderer` served from local files. This shell replicates exactly
-that with `QWebEngineUrlScheme` + `QWebEngineUrlSchemeHandler`: the shell
-origin is always "online" because it comes from disk, so **cold start works
-offline**; sync and auth go cross-origin to the vendor's cloud (their API
-answers `Access-Control-Allow-Origin: *`) exactly as in the official client.
+### Сборка из исходников
 
-- Baseline assets may be shipped at `/usr/share/singularity-shell/` →
-  first launch works offline out of the box.
-- A **silent background updater** checks the Snap Store once a day, downloads
-  newer assets into `$XDG_DATA_HOME/singularity-shell/assets/` (SHA3-384
-  verified), and stages them via an atomic symlink switch — active **on the
-  next start**. Disable with `--no-auto-update`.
-- All app state (cookies, IndexedDB, service workers) lives in a persistent
-  `QWebEngineProfile` under `$XDG_DATA_HOME/singularity-shell/profile/`.
+Установите deve-пакеты Qt и QtWebEngine.
 
-### Known issues
+```bash
+mkdir build
+cd build
+cmake ..
+make -j$(nproc)
+./singularity-shell
+```
 
-- **Print (Ctrl+P)**: printing the daily plan does not work (see `docs/printing.md`).
+## Как это работает
 
-## Architecture: converting an Electron app to QtWebEngine
+Официальный клиент Electron запускает приложение на привилегированном
+кастомном источнике `sg://renderer`, раздаваемом с локального диска. Эта оболочка
+в точности повторяет схему с помощью `QWebEngineUrlScheme` + `QWebEngineUrlSchemeHandler`:
+источник оболочки всегда «в сети», потому что ресурсы на диске, поэтому **холодный
+старт работает без интернета**; синхронизация и вход идут между источниками в
+облако вендора (его API отвечает `Access-Control-Allow-Origin: *`), как в
+официальном клиенте.
 
-This section is written as a reusable reference for anyone attempting a
-similar conversion. It covers the general pattern, the vendor-specific
-reverse-engineering process, and every non-obvious hack that was required.
+- Базовые ресурсы могут поставляться в `/usr/share/singularity-shell/` →
+  первый запуск работает без интернета «из коробки».
+- **Фоновый updater** раз в сутки проверяет Snap Store, загружает новые
+  ресурсы в `$XDG_DATA_HOME/singularity-shell/assets/` (проверка SHA3-384),
+  ставит их через атомарную замену symlink — применяются **при следующем
+  запуске**. Отключается флагом `--no-auto-update`.
+- Всё состояние (cookies, IndexedDB, service worker) хранится в постоянном
+  `QWebEngineProfile` в `$XDG_DATA_HOME/singularity-shell/profile/`.
 
-### The general pattern
+### Известные проблемы
 
-An Electron desktop app typically consists of:
+- **Печать (Ctrl+P)**: печать плана дня не работает (подробнее в `docs/printing.md`).
 
-1. A **custom URL scheme** (`sg://renderer` in this case) served from a
-   local directory — this is the whole application UI.
-2. A **preload script** injected into every page that exposes desktop
-   capabilities (`window.preloadApi`) via `contextBridge`.
-3. Cloud API calls made cross-origin from the custom scheme to the
-   vendor's servers.
+## Архитектура: превращаем Electron-приложение в QtWebEngine
 
-To replicate this with QtWebEngine you need:
+Этот раздел написан как переиспользуемая инструкция для тех, кто делает
+похожую миграцию. Здесь описан общий подход, процесс обратной разработки
+конкретного вендора и все неочевидные грабли, в которые мы наступили.
 
-| Electron concept | QtWebEngine equivalent |
+### Общая схема
+
+Десктопное Electron-приложение обычно состоит из:
+
+1. **Кастомной URL-схемы** (`sg://renderer` в нашем случае), раздаваемой
+   с локального диска — это и есть весь интерфейс приложения.
+2. **Preload-скрипта**, внедряемого на каждую страницу и выставляющего
+   доступ к API рабочего стола (`window.preloadApi`) через `contextBridge`.
+3. Облачных API-вызовов кросс-ориджинно с кастомной схемы к серверам вендора.
+
+Чтобы воспроизвести это на QtWebEngine, нужно:
+
+| Electron | QtWebEngine |
 |---|---|
 | `protocol.registerSchemesAsPrivileged` | `QWebEngineUrlScheme::registerScheme` |
 | `protocol.handle` | `QWebEngineUrlSchemeHandler` |
-| `contextBridge.exposeInMainWorld` | `QWebEngineScript` at `DocumentCreation` + `QWebChannel` |
+| `contextBridge.exposeInMainWorld` | `QWebEngineScript` на `DocumentCreation` + `QWebChannel` |
 | `BrowserWindow` | `QMainWindow` + `QWebEngineView` |
-| Persistent `session` | Named `QWebEngineProfile` + `setPersistentStoragePath` |
-| `autoUpdater` | Custom `UpdateController` querying Snap Store API directly |
+| Постоянная `session` | Именованный `QWebEngineProfile` + `setPersistentStoragePath` |
+| `autoUpdater` | Свой `UpdateController`, опрашивающий Snap Store API |
 
-### Reverse-engineering the vendor's preload API
+### Обратная разработка preload API вендора
 
-The most labor-intensive part is replicating the `window.preloadApi` surface.
-The approach:
+Самая трудоёмкая часть — воспроизведение поверхности `window.preloadApi`.
+Подход:
 
-1. **Download the vendor's snap** via the public Snap Store API (no snapd
-   needed — the `.snap` is just a SquashFS archive).
-2. **Extract `resources/app.asar`** (Electron archive format) using a
-   purpose-built tool (`tools/asar-extract.cpp` — dependency-free, ~200
-   lines of C++).
-3. **Read `build/main/preload.js`** — this is the vendor's preload script.
-   It defines a class that creates controller objects via an `ipcService`
-   helper. Every controller name and method signature must be matched.
-4. **Grep `build/js/app.bundle.js`** for `preloadApi.` call sites to
-   confirm which controllers and methods are actually called at runtime.
+1. **Скачать snap вендора** через публичный Snap Store API (snapd не нужен —
+   `.snap` это просто SquashFS-архив).
+2. **Извлечь `resources/app.asar`** (архивный формат Electron) с помощью
+   собственной утилиты (`tools/asar-extract.cpp` — без зависимостей, ~200
+   строк на C++).
+3. **Прочитать `build/main/preload.js`** — preload-скрипт вендора. Он
+   определяет класс, создающий объекты контроллеров через хелпер `ipcService`.
+   Нужно воспроизвести имя каждого контроллера и сигнатуру каждого метода.
+4. **Прогрепать `build/js/app.bundle.js`** на предмет `preloadApi.` для
+   подтверждения, какие контроллеры и методы реально вызываются во время работы.
 
-The vendor's preload structure (reverse-engineered from v12.6.0):
+Структура preload вендора (восстановлена из v12.6.0):
 
 ```
 preloadApi
@@ -104,132 +118,134 @@ preloadApi
 ├── zoomController       { ZOOM_IN, ZOOM_OUT, ZOOM_RESET }
 ├── urlController        { openExternal, openPath, supportsOpenPath }
 ├── appController        { QUIT_APP, RESTART_APP, … }
-├── fetchController      { fetch }          ← proxies to native fetch()
+├── fetchController      { fetch }          ← проксирует нативный fetch()
 ├── updateController     { checkUpdates, applyUpdateAndRestart }
 ├── menuController       { TOOLBAR_UPDATED, POPUP_MENU, … }
 ├── popupController      { open, close, sendResult, … }
-├── …and ~10 more controllers (all stubbed)
-└── windowRenderToMainBridge  ← spreads windowController + adds
+├── …и ещё ~10 контроллеров (все заглушены)
+└── windowRenderToMainBridge  ← расширяет windowController, добавляя
      addListener(), getPosition(), getBounds(), id
 ```
 
-### Hacks and gotchas
+### Грабли и хаки
 
-#### 1. `sg://` scheme MUST NOT be "local"
+#### 1. Схему `sg://` НЕЛЬЗЯ делать «local»
 
-Setting `LocalScheme | LocalAccessAllowed` on the custom scheme treats it
-like `file://` — Chromium forbids ANY fetch/XHR to remote http(s) origins.
-Every cloud API call fails instantly with `TypeError: Failed to fetch`
-**before** CORS, before any packet is sent. Nothing appears in DevTools
-Network. This killed all sync traffic and was extremely hard to diagnose.
+Установка `LocalScheme | LocalAccessAllowed` на кастомной схеме заставляет
+Chromium обращаться с ней как с `file://` — он запрещает ЛЮБОЙ fetch/XHR к
+удалённым http(s)-источникам. Каждый облачный вызов мгновенно падает с
+`TypeError: Failed to fetch` **до** CORS, до отправки хотя бы одного пакета.
+В DevTools Network — пусто. Это убивало весь трафик синхронизации, а диагностика заняла дни.
 
-Correct flags: `SecureScheme | ServiceWorkersAllowed | CorsEnabled |
-FetchApiAllowed` — exactly what the vendor's Electron code uses.
+Правильные флаги: `SecureScheme | ServiceWorkersAllowed | CorsEnabled |
+FetchApiAllowed` — ровно то, что использует код Electron у вендора.
 
-#### 2. Vendor gRPC-web `deadline` header
+#### 2. Заголовок `deadline` в gRPC-web вендора
 
-The vendor's gRPC-web client sends a custom `deadline` header. Their nginx
-CORS preflight response does NOT include it in `Access-Control-Allow-Headers`
-(true for ALL origins, including the official web client). The Electron
-desktop client avoids this by issuing API calls from the main process (Node
-axios, no CORS). Our renderer has neither.
+gRPC-web клиент вендора шлёт кастомный заголовок `deadline`. Их nginx в
+CORS preflight-ответе НЕ включает его в `Access-Control-Allow-Headers`
+(верно для ВСЕХ источников, включая официальный веб-клиент). Десктопный
+клиент Electron обходит это, отправляя API-вызовы из главного процесса
+(Node axios, без CORS). У нашего рендерера такой возможности нет.
 
-Fix: `VendorApiInterceptor` removes this one header for hosts under
-`*.singularity-app.com/.ru` before CORS evaluation. Surgical — no
-`--disable-web-security`. The header is only an advisory client-side timeout
-hint, semantically safe to drop.
+Исправление: `VendorApiInterceptor` удаляет этот единственный заголовок
+для хостов `*.singularity-app.com/.ru` до проверки CORS. Хирургически —
+без `--disable-web-security`. Заголовок лишь рекомендательный клиентский
+таймаут, семантически безопасно его выбросить.
 
-#### 3. QWebChannel argument serialization requires explicit String() cast
+#### 3. Сериализация аргументов QWebChannel требует явного `String()`
 
-When calling a C++ slot via QWebChannel's JS proxy, the argument must be
-an **explicit** JavaScript String. Passing a variable that holds a string
-(even if `typeof` says `"string"`) may produce an empty call on the C++
-side. Always use `b.slotName(String(jsVariable))`.
+При вызове C++ слота через JS-прокси QWebChannel аргумент должен быть
+**явным** JavaScript String. Передача переменной, содержащей строку (даже
+если `typeof` говорит `"string"`), может привести к пустому вызову на
+стороне C++. Всегда используйте `b.slotName(String(jsVariable))`.
 
-#### 4. Each window needs its own PreloadBridge instance
+#### 4. Каждому окну — свой экземпляр PreloadBridge
 
-The PreloadBridge emits signals (minimizeRequested, closeRequested, etc.).
-A single bridge shared across multiple windows causes signal cross-
-contamination: minimizing one window would toggle all of them. Each
-`createWindow()` popup creates a fresh `PreloadBridge` parented to its
+PreloadBridge испускает сигналы (minimizeRequested, closeRequested и др.).
+Один мост на несколько окон приводит к перекрёстному засорению сигналов:
+минимизация одного окна дёргала все. Каждое всплывающее окно, созданное через
+`createWindow()`, получает свежий `PreloadBridge`, привязанный к своему
 `QWebEngineView`.
 
-#### 5. `windowRenderToMainBridge` must spread windowController
+#### 5. `windowRenderToMainBridge` должен расширять windowController
 
-The vendor's `windowBridgeFactory` spreads ALL windowController methods
-into the bridge object plus adds `getPosition()`, `getBounds()`,
-`addListener(channel, cb)`, and `id`. The app accesses these through
-`this.provider.window.focus()` etc. A bare `{send, on}` stub causes
-`TypeError: e.addListener is not a function`.
+Вендорский `windowBridgeFactory` расширяет объект ВСЕМИ методами
+windowController плюс добавляет `getPosition()`, `getBounds()`,
+`addListener(channel, cb)` и `id`. Приложение обращается к ним через
+`this.provider.window.focus()` и т.п. Голая заглушка `{send, on}`
+вызывает `TypeError: e.addListener is not a function`.
 
-#### 6. Service Worker + custom schemes
+#### 6. Service Worker и кастомные схемы
 
-The vendor's SW registers on `sg://renderer` and intercepts fetch events
-for the shell origin. Validated: after first launch the SW is active and
-IndexedDB contains `AppDatabase` + `SingularityLogs3`; both persist across
-restarts. For local file serving the SW intercept is pure overhead, but
-**do not unregister it** — the SW also manages the offline sync queue.
+SW вендора регистрируется на `sg://renderer` и перехватывает события запросов
+для источника оболочки. Проверено: после первого запуска SW активен, IndexedDB
+содержит `AppDatabase` + `SingularityLogs3`; оба сохраняются между
+перезапусками. Для локальной раздачи файлов перехват SW — чистый оверхед,
+но **не удаляйте его** — SW также управляет офлайн-очередью синхронизации.
 
-#### 7. OAuth popups need in-app handling
+#### 7. Окна OAuth должны оставаться внутри приложения
 
-Login flows redirect through `accounts.google.com`, `appleid.apple.com`,
-`login.microsoftonline.com`. These MUST stay in-app (share cookies via the
-persistent profile) for `window.opener`-based auth completion. All other
-external URLs open in the system browser via `acceptNavigationRequest` →
-`QDesktopServices::openUrl`. Popups created for `target=_blank` links
-auto-close after delegating to the system browser.
+Процесс входа идёт через `accounts.google.com`, `appleid.apple.com`,
+`login.microsoftonline.com`. Эти хосты ОБЯЗАНЫ оставаться в приложении
+(общие cookies через постоянный профиль) для завершения аутентификации
+через `window.opener`. Все остальные внешние URL открываются в системном
+браузере через `acceptNavigationRequest` → `QDesktopServices::openUrl`.
+Попапы, созданные для `target=_blank`, автоматически закрываются после
+делегирования в системный браузер.
 
-#### 8. `QJsonDocument::fromVariant(QString)` produces invalid JS
+#### 8. `QJsonDocument::fromVariant(QString)` даёт некорректный JS
 
-Used for injecting status text into the bootstrap page. A bare
-`QJsonDocument::fromVariant(text)` on a QString produces a null document
-in some Qt versions; `toJson()` then returns empty, creating broken
-`<script>` content. Fix: wrap in `QVariantList{QVariant(text)}` → produces
-`["properly escaped text"]` → strip brackets.
+Используется для инъекции текста статуса на bootstrap-страницу.
+`QJsonDocument::fromVariant(text)` на чистом QString в некоторых версиях
+Qt возвращает null-документ; `toJson()` тогда возвращает пустоту, создавая
+битый `<script>`. Исправление: обернуть в `QVariantList{QVariant(text)}` →
+получается `["правильно заэкранированный текст"]` → обрезаем скобки.
 
-#### 9. Qt's `qt_standard_project_setup()` overwrites hand-edited .ts files
+#### 9. `qt_standard_project_setup()` затирает правленые вручную .ts-файлы
 
-When `LinguistTools` is in `find_package`, `qt_standard_project_setup()`
-auto-discovers `.ts` files in `translations/` and runs `lupdate`,
-overwriting hand-edited translations with empty templates. Fix: store
-`.ts` files in a non-standard directory (`i18n/`).
+Когда `LinguistTools` указан в `find_package`, `qt_standard_project_setup()`
+автоматически находит `.ts`-файлы в `translations/` и запускает `lupdate`,
+затирая ручные переводы пустыми шаблонами. Исправление: хранить `.ts` в
+нестандартной директории (`i18n/`).
 
-## Features
+## Возможности
 
-### Theme-aware background
+### Фон страницы под системную тему
 
-On startup the page background matches the system color scheme:
-dark `#1a1a2e` or light `#f0f0f5`. Changes live when the user switches
-the system theme (`QStyleHints::colorSchemeChanged`). Eliminates the
-jarring white flash before app content loads.
+При запуске фон страницы соответствует системной цветовой схеме:
+тёмный `#1a1a2e` или светлый `#f0f0f5`. Меняется на лету при
+переключении темы (`QStyleHints::colorSchemeChanged`). Убирает
+раздражающую белую вспышку до загрузки контента.
 
-### Zoom persistence
+### Сохранение масштаба
 
-Zoom level (Ctrl+= / Ctrl+- / Ctrl+0) is saved to
-`~/.local/share/singularity-shell/settings.conf` and restored on the
-next launch. The **Zoom** menu in the menu bar shows the current zoom
-percentage and offers Zoom In / Zoom Out / Reset actions.
+Масштаб (Ctrl+= / Ctrl+- / Ctrl+0) сохраняется в
+`~/.local/share/singularity-shell/settings.conf` и восстанавливается
+при следующем запуске. Меню **Масштаб** показывает текущий процент
+и предлагает действия Увеличить / Уменьшить / Сбросить.
 
-Keyboard shortcuts are handled via `eventFilter` on the
-`QWebEngineView` — Chromium's internal key handling intercepts
-`QShortcut` and `QAction` shortcuts at a lower Qt level.
+Клавиатурные сокращения обрабатываются через `eventFilter` на
+`QWebEngineView` — внутренняя обработка клавиш Chromium
+перехватывает `QShortcut` и `QAction` на более низком уровне Qt.
 
-## Code layout
+## Структура кода
 
 ```
-src/            C++ application (see qt-tz.md §6.1)
-tools/          asar-extract.cpp — dependency-free asar unpacker (tested)
-scripts/        fetch-assets.sh — snap → verified assets, no snapd (tested)
-resources/      bootstrap page (first-run fallback, FR-10)
-packaging/      .desktop file, RPM spec
-i18n/           Russian translations (Qt Linguist)
-docs/           printing.md — why plan-of-the-day print does not work
+src/            Приложение на C++ (см. qt-tz.md §6.1)
+tools/          asar-extract.cpp — распаковщик asar без зависимостей
+scripts/        fetch-assets.sh — snap → проверенные ресурсы, без snapd
+resources/      bootstrap-страница (заглушка первого запуска, FR-10)
+packaging/      .desktop-файл, RPM-спецификация
+i18n/           Русский перевод (Qt Linguist)
+docs/           printing.md — почему не работает печать плана дня
 ```
 
-## Data locations
-| Path | Content |
+## Расположение данных
+
+| Путь | Содержимое |
 |---|---|
-| `/usr/share/singularity-shell/assets/` | Baseline assets from the RPM (read-only) |
-| `~/.local/share/singularity-shell/assets/` | Background-updated assets (versioned, `current` symlink) |
-| `~/.local/share/singularity-shell/profile/` | Cookies, IndexedDB, SW, cache |
-| `~/.local/share/singularity-shell/settings.conf` | UI state, zoom, updater timestamps |
+| `/usr/share/singularity-shell/assets/` | Базовые ресурсы из RPM (только чтение) |
+| `~/.local/share/singularity-shell/assets/` | Ресурсы фонового обновления (версионированы, symlink `current`) |
+| `~/.local/share/singularity-shell/profile/` | Cookies, IndexedDB, SW, кеш |
+| `~/.local/share/singularity-shell/settings.conf` | Состояние UI, масштаб, временные метки updater |
