@@ -152,7 +152,7 @@ void PreloadBridge::installOn(QWebEnginePage* page)
         setAlwaysOnTop:    function () { return Promise.resolve(null); },
         moveTop:           function () { return Promise.resolve(null); },
         setFullScreen:     function () { return Promise.resolve(null); },
-        OPEN_NEW_WINDOW:       function () { window.open('sg://renderer/index.html'); return Promise.resolve(null); },
+        OPEN_NEW_WINDOW:       function () { return Promise.resolve(null); },
         SET_ERROR_IN_RENDER:   function () { return Promise.resolve(null); },
         SHOW_POMODORO_SETTINGS: function () { return Promise.resolve(null); }
     };
@@ -245,16 +245,18 @@ void PreloadBridge::installOn(QWebEnginePage* page)
 
             // Hide the New Window button: it calls OPEN_NEW_WINDOW which opens
             // a bare window without the PreloadBridge. Until we support proper
-            // multi-window, remove the button from the DOM.
-            var css2 = document.createElement('style');
-            // The New Window toolbar button renders an SVG icon named "new_window".
-            // Its parent button is inside header-top__toolbar. Hide it.
-            css2.textContent =
-                '.header-top__toolbar button:has(svg use[href*="new_window"])' +
-                ' { display: none !important; }';
+            // multi-window, remove the button from the DOM via a MutationObserver
+            // (the CSS :has() selector is not supported in this Chromium version).
+            var hideNewWindowBtn = function () {
+                var svg = document.querySelector('svg use[href*="new_window"]');
+                if (svg) {
+                    var btn = svg.closest('.toolbar-btn');
+                    if (btn) btn.style.display = 'none';
+                }
+            };
             document.addEventListener('DOMContentLoaded', function () {
-                var h = document.head || document.documentElement;
-                h.appendChild(css2);
+                hideNewWindowBtn();
+                new MutationObserver(hideNewWindowBtn).observe(document.body, { childList: true, subtree: true });
             });
         });
     }
