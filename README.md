@@ -1,7 +1,19 @@
 # singularity-shell
 
 Offline-capable **Qt 6 / QtWebEngine** wrapper for [SingularityApp](https://web.singularity-app.com/)
-— no snapd, no third-party browser binaries. Design document: `qt-tz.md`.
+— no snapd, no third-party browser binaries.
+
+![Inbox](docs/img-ru/inbox.png)
+
+![Sync status](docs/img-ru/sync-status.png)
+
+![Bootstrap](docs/img-ru/bootstrap.png)
+
+![Zoom menu](docs/img-ru/menu-zoom.png)
+
+![File menu](docs/img-ru/menu-file.png)
+
+![Diagnostics menu](docs/img-ru/menu-diagnostics.png)
 
 Tested on **ROSA Fresh 13.2, Qt 6.11.1**. Validated:
 
@@ -202,7 +214,7 @@ Keyboard shortcuts are handled via `eventFilter` on the
 `QWebEngineView` — Chromium's internal key handling intercepts
 `QShortcut` and `QAction` shortcuts at a lower Qt level.
 
-## Layout
+## Code layout
 
 ```
 src/            C++ application (see qt-tz.md §6.1)
