@@ -125,11 +125,8 @@ QWebEnginePage* NavigationPage::createWindow(WebWindowType type)
 
 void NavigationPage::openDiagnostics(QWebEngineProfile* profile, const QString& url)
 {
+    // No dark background: chrome:// pages use their own CSS with black text.
     auto* page = new QWebEnginePage(profile);
-    page->setBackgroundColor(QGuiApplication::styleHints()->colorScheme()
-                             == Qt::ColorScheme::Dark
-                             ? QColor(0x1a, 0x1a, 0x2e)
-                             : QColor(0xf0, 0xf0, 0xf5));
     auto* view = new QWebEngineView;
     view->setAttribute(Qt::WA_DeleteOnClose);
     view->setPage(page);
