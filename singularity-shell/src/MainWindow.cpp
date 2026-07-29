@@ -121,6 +121,10 @@ void MainWindow::showAbout()
         tr("<b>Singularity shell</b> %1<br/>"
            "Asset version: %2<br/>"
            "Data dir: %3<br/><br/>"
+           "Source code: <a href='https://github.com/mikhailnov/singularity-shell'>"
+           "github.com/mikhailnov/singularity-shell</a><br/>"
+           "Contact: GitHub issues or <a href='mailto:m@mikhailnov.ru'>m@mikhailnov.ru</a>"
+           "<br/><br/>"
            "Unofficial QtWebEngine wrapper. SingularityApp itself is "
            "proprietary software by its vendor.")
             .arg(QStringLiteral(APP_VERSION),
