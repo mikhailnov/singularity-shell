@@ -16,10 +16,10 @@
 #include <QShortcut>
 #include <QStandardPaths>
 #include <QStatusBar>
+#include <QStyleHints>
 #include <QUrl>
 #include <QWebEngineProfile>
 #include <QWebEngineView>
-
 MainWindow::MainWindow(QWebEngineProfile* profile, PreloadBridge* bridge,
                        const QString& assetVersion, QWidget* parent)
     : QMainWindow(parent)
@@ -29,10 +29,25 @@ MainWindow::MainWindow(QWebEngineProfile* profile, PreloadBridge* bridge,
     setWindowTitle(tr("Singularity"));
     resize(1280, 800);
 
+    const auto pageBg = []() -> QColor {
+        const bool dark = QGuiApplication::styleHints()->colorScheme()
+                          == Qt::ColorScheme::Dark;
+        return dark ? QColor(0x1a, 0x1a, 0x2e) : QColor(0xf0, 0xf0, 0xf5);
+    };
+
     m_view = new QWebEngineView(this);
     m_page = new NavigationPage(profile, /*permissivePopups=*/false, bridge, m_view);
-    m_page->setBackgroundColor(QColor(0x1a, 0x1a, 0x2e)); // dark bg, avoid white flash
+    m_page->setBackgroundColor(pageBg());
     m_view->setPage(m_page);
+    setCentralWidget(m_view);
+
+    connect(QGuiApplication::styleHints(), &QStyleHints::colorSchemeChanged,
+            this, [this] {
+        const bool dark = QGuiApplication::styleHints()->colorScheme()
+                          == Qt::ColorScheme::Dark;
+        m_page->setBackgroundColor(dark ? QColor(0x1a, 0x1a, 0x2e)
+                                        : QColor(0xf0, 0xf0, 0xf5));
+    });
     setCentralWidget(m_view);
 
     // External links from the main page go to the system browser (§6.6).

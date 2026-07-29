@@ -4,12 +4,14 @@
 #include <QAction>
 #include <QColor>
 #include <QDesktopServices>
+#include <QGuiApplication>
 #include <QKeySequence>
 #include <QLoggingCategory>
 #include <QMainWindow>
 #include <QMenu>
 #include <QMenuBar>
 #include <QStatusBar>
+#include <QStyleHints>
 #include <QWebEngineCertificateError>
 #include <QWebEnginePage>
 #include <QWebEngineProfile>
@@ -76,7 +78,10 @@ QWebEnginePage* NavigationPage::createWindow(WebWindowType type)
     auto* view = new QWebEngineView(win);
     auto* page = new NavigationPage(profile(), /*permissivePopups=*/false,
                                     /*bridge=*/nullptr, view);
-    page->setBackgroundColor(QColor(0x1a, 0x1a, 0x2e));
+    page->setBackgroundColor(QGuiApplication::styleHints()->colorScheme()
+                             == Qt::ColorScheme::Dark
+                             ? QColor(0x1a, 0x1a, 0x2e)
+                             : QColor(0xf0, 0xf0, 0xf5));
     view->setPage(page);
     win->setCentralWidget(view);
 
@@ -121,7 +126,10 @@ QWebEnginePage* NavigationPage::createWindow(WebWindowType type)
 void NavigationPage::openDiagnostics(QWebEngineProfile* profile, const QString& url)
 {
     auto* page = new QWebEnginePage(profile);
-    page->setBackgroundColor(QColor(0x1a, 0x1a, 0x2e));
+    page->setBackgroundColor(QGuiApplication::styleHints()->colorScheme()
+                             == Qt::ColorScheme::Dark
+                             ? QColor(0x1a, 0x1a, 0x2e)
+                             : QColor(0xf0, 0xf0, 0xf5));
     auto* view = new QWebEngineView;
     view->setAttribute(Qt::WA_DeleteOnClose);
     view->setPage(page);
