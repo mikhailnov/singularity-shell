@@ -66,41 +66,153 @@ answers `Access-Control-Allow-Origin: *`) exactly as in the official client.
 - All app state (cookies, IndexedDB, service workers) lives in a persistent
   `QWebEngineProfile` under `$XDG_DATA_HOME/singularity-shell/profile/`.
 
-## Build
+## Architecture: converting an Electron app to QtWebEngine
 
-```bash
-# Fedora/RHEL:    dnf install qt6-qtwebengine-devel qt6-qtwebchannel-devel \
-#                 cmake gcc-c++ squashfs-tools jq curl openssl rpm-build
-# Debian/Ubuntu:  apt install qt6-webengine-dev qt6-webchannel-dev \
-#                 cmake g++ squashfs-tools jq curl openssl
+This section is written as a reusable reference for anyone attempting a
+similar conversion. It covers the general pattern, the vendor-specific
+reverse-engineering process, and every non-obvious hack that was required.
 
-# Assets for the dev run (into the user data dir):
-./scripts/fetch-assets.sh latest ~/.local/share/singularity-shell
+### The general pattern
 
-cmake -B build -DCMAKE_BUILD_TYPE=Release
-cmake --build build -j$(nproc)
-./build/singularity-shell
-```
+An Electron desktop app typically consists of:
 
-## CLI
+1. A **custom URL scheme** (`sg://renderer` in this case) served from a
+   local directory — this is the whole application UI.
+2. A **preload script** injected into every page that exposes desktop
+   capabilities (`window.preloadApi`) via `contextBridge`.
+3. Cloud API calls made cross-origin from the custom scheme to the
+   vendor's servers.
 
-| Flag | Effect |
+To replicate this with QtWebEngine you need:
+
+| Electron concept | QtWebEngine equivalent |
 |---|---|
-| `--diagnose` | Log every request (read-only; FR-11) |
-| `--no-auto-update` | Disable background asset updates |
-| `--chromium-flags "<flags>"` | Extra flags for the Chromium engine |
+| `protocol.registerSchemesAsPrivileged` | `QWebEngineUrlScheme::registerScheme` |
+| `protocol.handle` | `QWebEngineUrlSchemeHandler` |
+| `contextBridge.exposeInMainWorld` | `QWebEngineScript` at `DocumentCreation` + `QWebChannel` |
+| `BrowserWindow` | `QMainWindow` + `QWebEngineView` |
+| Persistent `session` | Named `QWebEngineProfile` + `setPersistentStoragePath` |
+| `autoUpdater` | Custom `UpdateController` querying Snap Store API directly |
 
-## Debugging
+### Reverse-engineering the vendor's preload API
 
-```bash
-QTWEBENGINE_REMOTE_DEBUGGING=9223 ./build/singularity-shell
-# then open http://127.0.0.1:9223 in any Chromium browser:
-# DevTools for the page, service workers, IndexedDB, network
-./build/singularity-shell --diagnose 2>&1 | grep '\[request\]'
-# verbose Qt logs:
-QT_LOGGING_RULES="shell.*.debug=true" ./build/singularity-shell
+The most labor-intensive part is replicating the `window.preloadApi` surface.
+The approach:
+
+1. **Download the vendor's snap** via the public Snap Store API (no snapd
+   needed — the `.snap` is just a SquashFS archive).
+2. **Extract `resources/app.asar`** (Electron archive format) using a
+   purpose-built tool (`tools/asar-extract.cpp` — dependency-free, ~200
+   lines of C++).
+3. **Read `build/main/preload.js`** — this is the vendor's preload script.
+   It defines a class that creates controller objects via an `ipcService`
+   helper. Every controller name and method signature must be matched.
+4. **Grep `build/js/app.bundle.js`** for `preloadApi.` call sites to
+   confirm which controllers and methods are actually called at runtime.
+
+The vendor's preload structure (reverse-engineered from v12.6.0):
+
+```
+preloadApi
+├── ipcRenderer          { send, on, off }
+├── isPopup              bool
+├── windowController     { minimize, maximize, close, isMaximized, getId,
+│                          isVisible, isFocused, isFullScreen, hide, show,
+│                          focus, blur, setAlwaysOnTop, moveTop,
+│                          setFullScreen, OPEN_NEW_WINDOW, … }
+├── zoomController       { ZOOM_IN, ZOOM_OUT, ZOOM_RESET }
+├── urlController        { openExternal, openPath, supportsOpenPath }
+├── appController        { QUIT_APP, RESTART_APP, … }
+├── fetchController      { fetch }          ← proxies to native fetch()
+├── updateController     { checkUpdates, applyUpdateAndRestart }
+├── menuController       { TOOLBAR_UPDATED, POPUP_MENU, … }
+├── popupController      { open, close, sendResult, … }
+├── …and ~10 more controllers (all stubbed)
+└── windowRenderToMainBridge  ← spreads windowController + adds
+     addListener(), getPosition(), getBounds(), id
 ```
 
+### Hacks and gotchas
+
+#### 1. `sg://` scheme MUST NOT be "local"
+
+Setting `LocalScheme | LocalAccessAllowed` on the custom scheme treats it
+like `file://` — Chromium forbids ANY fetch/XHR to remote http(s) origins.
+Every cloud API call fails instantly with `TypeError: Failed to fetch`
+**before** CORS, before any packet is sent. Nothing appears in DevTools
+Network. This killed all sync traffic and was extremely hard to diagnose.
+
+Correct flags: `SecureScheme | ServiceWorkersAllowed | CorsEnabled |
+FetchApiAllowed` — exactly what the vendor's Electron code uses.
+
+#### 2. Vendor gRPC-web `deadline` header
+
+The vendor's gRPC-web client sends a custom `deadline` header. Their nginx
+CORS preflight response does NOT include it in `Access-Control-Allow-Headers`
+(true for ALL origins, including the official web client). The Electron
+desktop client avoids this by issuing API calls from the main process (Node
+axios, no CORS). Our renderer has neither.
+
+Fix: `VendorApiInterceptor` removes this one header for hosts under
+`*.singularity-app.com/.ru` before CORS evaluation. Surgical — no
+`--disable-web-security`. The header is only an advisory client-side timeout
+hint, semantically safe to drop.
+
+#### 3. QWebChannel argument serialization requires explicit String() cast
+
+When calling a C++ slot via QWebChannel's JS proxy, the argument must be
+an **explicit** JavaScript String. Passing a variable that holds a string
+(even if `typeof` says `"string"`) may produce an empty call on the C++
+side. Always use `b.slotName(String(jsVariable))`.
+
+#### 4. Each window needs its own PreloadBridge instance
+
+The PreloadBridge emits signals (minimizeRequested, closeRequested, etc.).
+A single bridge shared across multiple windows causes signal cross-
+contamination: minimizing one window would toggle all of them. Each
+`createWindow()` popup creates a fresh `PreloadBridge` parented to its
+`QWebEngineView`.
+
+#### 5. `windowRenderToMainBridge` must spread windowController
+
+The vendor's `windowBridgeFactory` spreads ALL windowController methods
+into the bridge object plus adds `getPosition()`, `getBounds()`,
+`addListener(channel, cb)`, and `id`. The app accesses these through
+`this.provider.window.focus()` etc. A bare `{send, on}` stub causes
+`TypeError: e.addListener is not a function`.
+
+#### 6. Service Worker + custom schemes
+
+The vendor's SW registers on `sg://renderer` and intercepts fetch events
+for the shell origin. For local file serving this is pure overhead (the
+files are always on disk), but **do not unregister it** — the SW also
+manages the app's offline sync queue. Our scheme handler serves files with
+correct MIME types; the SW falls through to the network for uncached
+resources, which our handler satisfies instantly.
+
+#### 7. OAuth popups need in-app handling
+
+Login flows redirect through `accounts.google.com`, `appleid.apple.com`,
+`login.microsoftonline.com`. These MUST stay in-app (share cookies via the
+persistent profile) for `window.opener`-based auth completion. All other
+external URLs open in the system browser via `acceptNavigationRequest` →
+`QDesktopServices::openUrl`. Popups created for `target=_blank` links
+auto-close after delegating to the system browser.
+
+#### 8. `QJsonDocument::fromVariant(QString)` produces invalid JS
+
+Used for injecting status text into the bootstrap page. A bare
+`QJsonDocument::fromVariant(text)` on a QString produces a null document
+in some Qt versions; `toJson()` then returns empty, creating broken
+`<script>` content. Fix: wrap in `QVariantList{QVariant(text)}` → produces
+`["properly escaped text"]` → strip brackets.
+
+#### 9. Qt's `qt_standard_project_setup()` overwrites hand-edited .ts files
+
+When `LinguistTools` is in `find_package`, `qt_standard_project_setup()`
+auto-discovers `.ts` files in `translations/` and runs `lupdate`,
+overwriting hand-edited translations with empty templates. Fix: store
+`.ts` files in a non-standard directory (`i18n/`).
 Offline cold-start test: `nmcli networking off` (or `unshare -n
 ./build/singularity-shell`), launch, work, quit, launch again.
 
