@@ -30,6 +30,11 @@ answers `Access-Control-Allow-Origin: *`) exactly as in the official client.
   next start**. Disable with `--no-auto-update`.
 - All app state (cookies, IndexedDB, service workers) lives in a persistent
   `QWebEngineProfile` under `$XDG_DATA_HOME/singularity-shell/profile/`.
+
+### Known issues
+
+- **Print (Ctrl+P)**: printing the daily plan does not work.
+
 ## Architecture: converting an Electron app to QtWebEngine
 
 This section is written as a reusable reference for anyone attempting a
