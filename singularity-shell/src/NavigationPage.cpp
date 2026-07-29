@@ -73,9 +73,10 @@ QWebEnginePage* NavigationPage::createWindow(WebWindowType type)
     quit->setShortcut(QKeySequence::Quit);
 
     QMenu* diagMenu = win->menuBar()->addMenu(tr("&Diagnostics"));
-    diagMenu->addAction(tr("chrome://gpu"), win, [] {
-        openDiagnostics();
-    });
+    diagMenu->addAction(tr("chrome://gpu"), win, [] { openDiagnostics(QStringLiteral("chrome://gpu")); });
+    diagMenu->addAction(tr("chrome://net-internals"), win, [] { openDiagnostics(QStringLiteral("chrome://net-internals")); });
+    diagMenu->addAction(tr("chrome://serviceworker-internals"), win, [] { openDiagnostics(QStringLiteral("chrome://serviceworker-internals")); });
+    diagMenu->addAction(tr("chrome://tracing"), win, [] { openDiagnostics(QStringLiteral("chrome://tracing")); });
 
     auto* view = new QWebEngineView(win);
     auto* page = new NavigationPage(profile(), /*permissivePopups=*/true,
@@ -97,13 +98,13 @@ QWebEnginePage* NavigationPage::createWindow(WebWindowType type)
     return page;
 }
 
-void NavigationPage::openDiagnostics()
+void NavigationPage::openDiagnostics(const QString& url)
 {
     auto* view = new QWebEngineView;
     view->setAttribute(Qt::WA_DeleteOnClose);
     view->resize(900, 700);
-    view->setWindowTitle(QStringLiteral("Diagnostics — chrome://gpu"));
-    view->load(QUrl(QStringLiteral("chrome://gpu")));
+    view->setWindowTitle(QStringLiteral("Diagnostics — ") + url);
+    view->load(QUrl(url));
     view->show();
 }
 

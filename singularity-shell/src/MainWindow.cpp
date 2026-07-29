@@ -78,9 +78,10 @@ void MainWindow::buildMenus()
     quit->setMenuRole(QAction::QuitRole);
 
     QMenu* diagMenu = menuBar()->addMenu(tr("&Diagnostics"));
-    diagMenu->addAction(tr("chrome://gpu"), this, [] {
-        NavigationPage::openDiagnostics();
-    });
+    diagMenu->addAction(tr("chrome://gpu"), this, [] { NavigationPage::openDiagnostics(QStringLiteral("chrome://gpu")); });
+    diagMenu->addAction(tr("chrome://net-internals"), this, [] { NavigationPage::openDiagnostics(QStringLiteral("chrome://net-internals")); });
+    diagMenu->addAction(tr("chrome://serviceworker-internals"), this, [] { NavigationPage::openDiagnostics(QStringLiteral("chrome://serviceworker-internals")); });
+    diagMenu->addAction(tr("chrome://tracing"), this, [] { NavigationPage::openDiagnostics(QStringLiteral("chrome://tracing")); });
 }
 
 void MainWindow::loadApp()
