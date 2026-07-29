@@ -27,6 +27,8 @@
 На Росе 13+: `sudo dnf install singularity-shell`  
 (Роса Фреш, Роса Хром)
 
+Исходники RPM: https://abf.io/import/singularity-shell
+
 ### Сборка из исходников
 
 Установите deve-пакеты Qt и QtWebEngine.

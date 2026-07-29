@@ -26,6 +26,8 @@ The offline javascript version from the Snap package is reused.
 
 On ROSA 13+: `sudo dnf install singularity-shell`
 
+RPM packaging sources: https://abf.io/import/singularity-shell
+
 ### Building from source
 
 Install devel parts of Qt and QtWebEngine.
