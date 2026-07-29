@@ -63,23 +63,10 @@ bool NavigationPage::acceptNavigationRequest(const QUrl& url, NavigationType typ
 QWebEnginePage* NavigationPage::createWindow(WebWindowType type)
 {
     Q_UNUSED(type);
-    // Wrap in QMainWindow for menu bar; no status bar (always hidden).
     auto* win = new QMainWindow;
     win->setAttribute(Qt::WA_DeleteOnClose);
     win->resize(1024, 768);
     win->statusBar()->hide();
-
-    QMenu* menu = win->menuBar()->addMenu(tr("&File"));
-    QAction* quit = menu->addAction(tr("&Quit"), win, &QWidget::close);
-    quit->setShortcut(QKeySequence::Quit);
-
-    QMenu* diagMenu = win->menuBar()->addMenu(tr("&Diagnostics"));
-    auto* p = profile();
-    diagMenu->addAction(tr("chrome://gpu"), win, [p] { openDiagnostics(p, QStringLiteral("chrome://gpu")); });
-    diagMenu->addAction(tr("chrome://indexeddb-internals"), win, [p] { openDiagnostics(p, QStringLiteral("chrome://indexeddb-internals")); });
-    diagMenu->addAction(tr("chrome://net-internals"), win, [p] { openDiagnostics(p, QStringLiteral("chrome://net-internals")); });
-    diagMenu->addAction(tr("chrome://serviceworker-internals"), win, [p] { openDiagnostics(p, QStringLiteral("chrome://serviceworker-internals")); });
-    diagMenu->addAction(tr("chrome://tracing"), win, [p] { openDiagnostics(p, QStringLiteral("chrome://tracing")); });
 
     auto* view = new QWebEngineView(win);
     auto* page = new NavigationPage(profile(), /*permissivePopups=*/true,
@@ -92,6 +79,23 @@ QWebEnginePage* NavigationPage::createWindow(WebWindowType type)
     popupBridge->setVersions(m_bridge ? m_bridge->appVersion() : QString(),
                              m_bridge ? m_bridge->assetVersion() : QString());
     popupBridge->installOn(page);
+
+    // Menus (after page is created so lambdas can capture it).
+    QMenu* menu = win->menuBar()->addMenu(tr("&File"));
+    QAction* quit = menu->addAction(tr("&Quit"), win, &QWidget::close);
+    quit->setShortcut(QKeySequence::Quit);
+
+    QMenu* diagMenu = win->menuBar()->addMenu(tr("&Diagnostics"));
+    diagMenu->addAction(tr("Force reload"), win, [page] {
+        page->triggerAction(QWebEnginePage::ReloadAndBypassCache);
+    });
+    diagMenu->addSeparator();
+    auto* p = profile();
+    diagMenu->addAction(QStringLiteral("chrome://gpu"), win, [p] { openDiagnostics(p, QStringLiteral("chrome://gpu")); });
+    diagMenu->addAction(QStringLiteral("chrome://indexeddb-internals"), win, [p] { openDiagnostics(p, QStringLiteral("chrome://indexeddb-internals")); });
+    diagMenu->addAction(QStringLiteral("chrome://net-internals"), win, [p] { openDiagnostics(p, QStringLiteral("chrome://net-internals")); });
+    diagMenu->addAction(QStringLiteral("chrome://serviceworker-internals"), win, [p] { openDiagnostics(p, QStringLiteral("chrome://serviceworker-internals")); });
+    diagMenu->addAction(QStringLiteral("chrome://tracing"), win, [p] { openDiagnostics(p, QStringLiteral("chrome://tracing")); });
 
     QObject::connect(page, &QWebEnginePage::windowCloseRequested,
                      win, &QWidget::close);

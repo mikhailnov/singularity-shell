@@ -16,7 +16,6 @@ SgSchemeHandler::SgSchemeHandler(QString assetRoot, QObject* parent)
 
 QString SgSchemeHandler::resolveFile(const QString& urlPath) const
 {
-    // Map "/" -> index.html; strip leading slash; normalize; reject traversal.
     QString rel = urlPath;
     if (rel.isEmpty() || rel == QStringLiteral("/"))
         rel = QStringLiteral("index.html");
@@ -32,8 +31,6 @@ QString SgSchemeHandler::resolveFile(const QString& urlPath) const
     QFileInfo fi(candidate);
     if (!fi.isFile())
         return {};
-    // Do not follow symlinks out of the asset root (defense in depth; assets
-    // are extracted by our own tooling and contain no symlinks at all).
     if (fi.isSymLink())
         return {};
     const QString canonical = fi.canonicalFilePath();
@@ -44,8 +41,6 @@ QString SgSchemeHandler::resolveFile(const QString& urlPath) const
 
 QByteArray SgSchemeHandler::mimeFor(const QString& path)
 {
-    // Explicit overrides first: system MIME databases vary and the SPA is
-    // unforgiving about wrong script/style MIME types (FR-1, §6.3).
     static const QHash<QString, QByteArray> overrides = {
         {QStringLiteral("html"), "text/html; charset=utf-8"},
         {QStringLiteral("js"),   "text/javascript"},
@@ -74,7 +69,6 @@ QByteArray SgSchemeHandler::mimeFor(const QString& path)
 
 void SgSchemeHandler::requestStarted(QWebEngineUrlRequestJob* job)
 {
-    // Host check: we only serve the shell origin; anything else on sg:// is a bug.
     if (job->requestUrl().host() != QStringLiteral("renderer")) {
         job->fail(QWebEngineUrlRequestJob::UrlNotFound);
         return;
@@ -93,8 +87,6 @@ void SgSchemeHandler::requestStarted(QWebEngineUrlRequestJob* job)
         return;
     }
 
-    // Read fully into a buffer: reply() requires the device to outlive the job;
-    // buffer also gives QtWebEngine a known size. Assets are at most ~10 MB.
     auto* buffer = new QBuffer;
     buffer->setData(file->readAll());
     file->close();

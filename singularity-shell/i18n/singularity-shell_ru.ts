@@ -35,6 +35,10 @@
         <source>&amp;Diagnostics</source>
         <translation>&amp;Диагностика</translation>
     </message>
+    <message>
+        <source>Force reload</source>
+        <translation>Перезагрузить</translation>
+    </message>
 </context>
 <context>
     <name>NavigationPage</name>
@@ -45,6 +49,10 @@
     <message>
         <source>Singularity — new window</source>
         <translation>Singularity — новое окно</translation>
+    </message>
+    <message>
+        <source>Force reload</source>
+        <translation>Перезагрузить</translation>
     </message>
 </context>
 </TS>
