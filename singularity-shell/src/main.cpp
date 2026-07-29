@@ -2,6 +2,8 @@
 // See qt-tz.md. Entry point: scheme registration, profile setup, asset
 // resolution (FR-9a), main window, background updater (FR-9).
 
+#include "SettingsPath.h"
+
 #include <QApplication>
 #include <QCommandLineParser>
 #include <QDir>
@@ -72,11 +74,9 @@ int main(int argc, char* argv[])
 {
     registerSgScheme();
 
-    // NOTE: no organizationName — with both org+app set, QStandardPaths
-    // produces ~/.local/share/<org>/<app>/ (doubled path). With an empty org
-    // name the data dir is simply ~/.local/share/singularity-shell/.
     QCoreApplication::setApplicationName(QStringLiteral("singularity-shell"));
     QCoreApplication::setApplicationVersion(QStringLiteral(APP_VERSION));
+
 
     // Pre-parse --chromium-flags (rest goes to Qt).
     for (int i = 1; i < argc - 1; ++i) {
@@ -156,14 +156,12 @@ int main(int argc, char* argv[])
         qCInfo(lcMain) << "serving assets:" << active.version << "r" << active.revision
                        << "from" << active.root;
 
-    // Persist the running set so the updater never prunes it from under us.
-    QSettings().setValue(QStringLiteral("runtime/activeAssetDir"), active.root);
 
     // --- Persistent profile (FR-3, §6.4) --------------------------------------
     auto* profile = new QWebEngineProfile(QStringLiteral("singularity"), &app);
     profile->setPersistentStoragePath(dataDir + QStringLiteral("/profile"));
     profile->setCachePath(dataDir + QStringLiteral("/profile-cache"));
-    profile->setHttpCacheType(QWebEngineProfile::DiskHttpCache);
+    QSettings(settingsPath(), QSettings::IniFormat).setValue(QStringLiteral("runtime/activeAssetDir"), active.root);
     profile->setPersistentCookiesPolicy(QWebEngineProfile::ForcePersistentCookies);
 
     QWebEngineSettings* ws = profile->settings();
@@ -247,7 +245,7 @@ int main(int argc, char* argv[])
             auto* h = new SgSchemeHandler(dir, profile);
             profile->installUrlSchemeHandler("sg", h);
             window.setUpdateStatus(QStringLiteral("Version %1 installed — starting…").arg(version));
-            QSettings().setValue(QStringLiteral("runtime/activeAssetDir"), dir);
+            QSettings(settingsPath(), QSettings::IniFormat).setValue(QStringLiteral("runtime/activeAssetDir"), dir);
             window.loadApp();
         });
     }

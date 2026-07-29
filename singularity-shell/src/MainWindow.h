@@ -31,9 +31,10 @@ public slots:
 
 protected:
     void closeEvent(QCloseEvent* event) override;
-
+    bool eventFilter(QObject* obj, QEvent* event) override;
 private:
     void buildMenus();
+    void setZoom(double factor);
 
     QWebEngineView* m_view = nullptr;
     NavigationPage* m_page = nullptr;

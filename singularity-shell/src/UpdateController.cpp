@@ -1,5 +1,6 @@
 #include "UpdateController.h"
 
+#include "SettingsPath.h"
 #include <QCryptographicHash>
 #include <QDateTime>
 #include <QDir>
@@ -54,7 +55,7 @@ void UpdateController::startImmediately()
 
 bool UpdateController::rateLimited() const
 {
-    QSettings s;
+    QSettings s(settingsPath(), QSettings::IniFormat);
     const QDateTime last = s.value(QStringLiteral("update/lastCheck")).toDateTime();
     return last.isValid()
         && last.msecsTo(QDateTime::currentDateTimeUtc()) < kRateLimitMs;
@@ -94,7 +95,7 @@ void UpdateController::check()
         qCInfo(lcUpd) << "skipped: checked less than 24 h ago";
         return;
     }
-    QSettings().setValue(QStringLiteral("update/lastCheck"),
+    QSettings(settingsPath(), QSettings::IniFormat).setValue(QStringLiteral("update/lastCheck"),
                          QDateTime::currentDateTimeUtc());
 
     setState(State::Checking);

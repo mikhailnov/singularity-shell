@@ -2,6 +2,8 @@
 
 #include "NavigationPage.h"
 #include "PreloadBridge.h"
+#include "SettingsPath.h"
+
 
 #include <QAction>
 #include <QApplication>
@@ -9,6 +11,7 @@
 #include <QColor>
 #include <QDesktopServices>
 #include <QJsonDocument>
+#include <QKeyEvent>
 #include <QLabel>
 #include <QMenuBar>
 #include <QMessageBox>
@@ -48,39 +51,26 @@ MainWindow::MainWindow(QWebEngineProfile* profile, PreloadBridge* bridge,
         m_page->setBackgroundColor(dark ? QColor(0x1a, 0x1a, 0x2e)
                                         : QColor(0xf0, 0xf0, 0xf5));
     });
-    setCentralWidget(m_view);
 
-    // External links from the main page go to the system browser (§6.6).
+    // External links from the main page go to the system browser.
     connect(m_page, &NavigationPage::externalUrlRequested, this,
             [](const QUrl& url) { QDesktopServices::openUrl(url); });
 
-    // Bridge wiring (FR-7). Signal connections are now set up per-page in
-    // installOn(), so each window (main + popups) controls itself.
+    // Bridge wiring (FR-7).
     if (bridge)
         bridge->installOn(m_page);
 
     // Non-intrusive update indicator in the status bar (FR-9: no popups).
-    // Hidden by default — only shown when there's text to display.
     m_updateStatus = new QLabel(this);
     statusBar()->addPermanentWidget(m_updateStatus);
     statusBar()->hide();
 
-    // Zoom shortcuts.
-    auto addZoomShortcut = [this](const QKeySequence& seq, double delta) {
-        auto* sc = new QShortcut(seq, this);
-        connect(sc, &QShortcut::activated, this, [this, delta] {
-            m_page->setZoomFactor(qBound(0.25, m_page->zoomFactor() + delta, 5.0));
-        });
-    };
-    addZoomShortcut(QKeySequence::ZoomIn, 0.1);
-    addZoomShortcut(QKeySequence::ZoomOut, -0.1);
-    auto* reset = new QShortcut(QKeySequence(QStringLiteral("Ctrl+0")), this);
-    connect(reset, &QShortcut::activated, this, [this] { m_page->setZoomFactor(1.0); });
-
+    // Intercept zoom keys before QWebEngineView (Chromium) consumes them.
+    m_view->installEventFilter(this);
     buildMenus();
 
     // Restore geometry.
-    QSettings s;
+    QSettings s(settingsPath(), QSettings::IniFormat);
     const QByteArray geo = s.value(QStringLiteral("ui/geometry")).toByteArray();
     if (!geo.isEmpty())
         restoreGeometry(geo);
@@ -104,12 +94,41 @@ void MainWindow::buildMenus()
     diagMenu->addAction(QStringLiteral("chrome://net-internals"), this, [this] { NavigationPage::openDiagnostics(m_profile, QStringLiteral("chrome://net-internals")); });
     diagMenu->addAction(QStringLiteral("chrome://serviceworker-internals"), this, [this] { NavigationPage::openDiagnostics(m_profile, QStringLiteral("chrome://serviceworker-internals")); });
     diagMenu->addAction(QStringLiteral("chrome://tracing"), this, [this] { NavigationPage::openDiagnostics(m_profile, QStringLiteral("chrome://tracing")); });
+
+    QMenu* viewMenu = menuBar()->addMenu(tr("&Zoom"));
+    QAction* zoomLabel = viewMenu->addAction(tr("100 %"));
+    zoomLabel->setEnabled(false);
+    QObject::connect(viewMenu, &QMenu::aboutToShow, this, [zoomLabel, this] {
+        zoomLabel->setText(QStringLiteral("%1 %").arg(qRound(m_page->zoomFactor() * 100)));
+    });
+    viewMenu->addSeparator();
+    viewMenu->addAction(tr("Zoom &In"), this, [this] { setZoom(m_page->zoomFactor() + 0.1); },
+                        QKeySequence::ZoomIn);
+    viewMenu->addAction(tr("Zoom &Out"), this, [this] { setZoom(m_page->zoomFactor() - 0.1); },
+                        QKeySequence::ZoomOut);
+    viewMenu->addAction(tr("&Reset"), this, [this] { setZoom(1.0); },
+                        QKeySequence(QStringLiteral("Ctrl+0")));
+}
+
+void MainWindow::setZoom(double factor)
+{
+    factor = qBound(0.25, factor, 5.0);
+    m_page->setZoomFactor(factor);
+    QSettings(settingsPath(), QSettings::IniFormat).setValue(QStringLiteral("ui/zoomFactor"), factor);
 }
 
 void MainWindow::loadApp()
 {
     m_page->load(QUrl(QStringLiteral("sg://renderer/index.html")));
+    // Restore persisted zoom after the page loads.
+    connect(m_page, &QWebEnginePage::loadFinished, this, [this](bool ok) {
+        if (!ok) return;
+        const double z = QSettings(settingsPath(), QSettings::IniFormat).value(QStringLiteral("ui/zoomFactor"), 1.0).toDouble();
+        if (z != 1.0)
+            m_page->setZoomFactor(qBound(0.25, z, 5.0));
+    }, Qt::SingleShotConnection);
 }
+
 
 void MainWindow::loadBootstrap()
 {
@@ -153,8 +172,32 @@ void MainWindow::showAbout()
                  QStandardPaths::writableLocation(QStandardPaths::AppDataLocation)));
 }
 
+bool MainWindow::eventFilter(QObject* obj, QEvent* event)
+{
+    if (event->type() == QEvent::KeyPress && obj == m_view) {
+        auto* ke = static_cast<QKeyEvent*>(event);
+        const int key = ke->key();
+        const auto mods = ke->modifiers();
+        if (mods == Qt::ControlModifier) {
+            if (key == Qt::Key_Equal || key == Qt::Key_Plus) {
+                setZoom(m_page->zoomFactor() + 0.1);
+                return true;
+            }
+            if (key == Qt::Key_Minus) {
+                setZoom(m_page->zoomFactor() - 0.1);
+                return true;
+            }
+            if (key == Qt::Key_0) {
+                setZoom(1.0);
+                return true;
+            }
+        }
+    }
+    return QMainWindow::eventFilter(obj, event);
+}
+
 void MainWindow::closeEvent(QCloseEvent* event)
 {
-    QSettings().setValue(QStringLiteral("ui/geometry"), saveGeometry());
+    QSettings(settingsPath(), QSettings::IniFormat).setValue(QStringLiteral("ui/geometry"), saveGeometry());
     QMainWindow::closeEvent(event);
 }

@@ -33,7 +33,7 @@ answers `Access-Control-Allow-Origin: *`) exactly as in the official client.
 
 ### Known issues
 
-- **Print (Ctrl+P)**: printing the daily plan does not work.
+- **Print (Ctrl+P)**: printing the daily plan does not work (see `docs/printing.md`).
 
 ## Architecture: converting an Electron app to QtWebEngine
 
@@ -182,6 +182,26 @@ auto-discovers `.ts` files in `translations/` and runs `lupdate`,
 overwriting hand-edited translations with empty templates. Fix: store
 `.ts` files in a non-standard directory (`i18n/`).
 
+## Features
+
+### Theme-aware background
+
+On startup the page background matches the system color scheme:
+dark `#1a1a2e` or light `#f0f0f5`. Changes live when the user switches
+the system theme (`QStyleHints::colorSchemeChanged`). Eliminates the
+jarring white flash before app content loads.
+
+### Zoom persistence
+
+Zoom level (Ctrl+= / Ctrl+- / Ctrl+0) is saved to
+`~/.local/share/singularity-shell/settings.conf` and restored on the
+next launch. The **Zoom** menu in the menu bar shows the current zoom
+percentage and offers Zoom In / Zoom Out / Reset actions.
+
+Keyboard shortcuts are handled via `eventFilter` on the
+`QWebEngineView` — Chromium's internal key handling intercepts
+`QShortcut` and `QAction` shortcuts at a lower Qt level.
+
 ## Layout
 
 ```
@@ -190,14 +210,14 @@ tools/          asar-extract.cpp — dependency-free asar unpacker (tested)
 scripts/        fetch-assets.sh — snap → verified assets, no snapd (tested)
 resources/      bootstrap page (first-run fallback, FR-10)
 packaging/      .desktop file, RPM spec
-docs/           phase0.md (fill in per qt-tz.md §7)
+i18n/           Russian translations (Qt Linguist)
+docs/           printing.md — why plan-of-the-day print does not work
 ```
 
 ## Data locations
-
 | Path | Content |
 |---|---|
 | `/usr/share/singularity-shell/assets/` | Baseline assets from the RPM (read-only) |
 | `~/.local/share/singularity-shell/assets/` | Background-updated assets (versioned, `current` symlink) |
 | `~/.local/share/singularity-shell/profile/` | Cookies, IndexedDB, SW, cache |
-| `~/.config/singularity-shell/settings.ini` | UI state, updater timestamps |
+| `~/.local/share/singularity-shell/settings.conf` | UI state, zoom, updater timestamps |
