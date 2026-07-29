@@ -99,9 +99,10 @@ int main(int argc, char* argv[])
 
     QTranslator appTranslator;
     const QStringList tsPaths = {
-        QStringLiteral(SINGULARITY_SHELL_DATADIR) + QStringLiteral("/translations"),
-        QCoreApplication::applicationDirPath() + QStringLiteral("/../translations"),
-        QCoreApplication::applicationDirPath() + QStringLiteral("/translations"),
+        QCoreApplication::applicationDirPath(),                              // build dir
+        QStringLiteral(SINGULARITY_SHELL_DATADIR) + QStringLiteral("/translations"),  // installed
+        QCoreApplication::applicationDirPath() + QStringLiteral("/../translations"),   // dev tree
+        QCoreApplication::applicationDirPath() + QStringLiteral("/translations"),      // bundled
     };
     for (const QString& p : tsPaths) {
         if (appTranslator.load(QLocale(), QStringLiteral("singularity-shell"),
