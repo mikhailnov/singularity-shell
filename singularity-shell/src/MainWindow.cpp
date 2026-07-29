@@ -22,6 +22,7 @@
 MainWindow::MainWindow(QWebEngineProfile* profile, PreloadBridge* bridge,
                        const QString& assetVersion, QWidget* parent)
     : QMainWindow(parent)
+    , m_profile(profile)
     , m_assetVersion(assetVersion)
 {
     setWindowTitle(tr("Singularity"));
@@ -76,12 +77,12 @@ void MainWindow::buildMenus()
     QAction* quit = appMenu->addAction(tr("&Quit"), qApp, &QApplication::quit);
     quit->setShortcut(QKeySequence::Quit);
     quit->setMenuRole(QAction::QuitRole);
-
     QMenu* diagMenu = menuBar()->addMenu(tr("&Diagnostics"));
-    diagMenu->addAction(tr("chrome://gpu"), this, [] { NavigationPage::openDiagnostics(QStringLiteral("chrome://gpu")); });
-    diagMenu->addAction(tr("chrome://net-internals"), this, [] { NavigationPage::openDiagnostics(QStringLiteral("chrome://net-internals")); });
-    diagMenu->addAction(tr("chrome://serviceworker-internals"), this, [] { NavigationPage::openDiagnostics(QStringLiteral("chrome://serviceworker-internals")); });
-    diagMenu->addAction(tr("chrome://tracing"), this, [] { NavigationPage::openDiagnostics(QStringLiteral("chrome://tracing")); });
+    diagMenu->addAction(tr("chrome://gpu"), this, [this] { NavigationPage::openDiagnostics(m_profile, QStringLiteral("chrome://gpu")); });
+    diagMenu->addAction(tr("chrome://indexeddb-internals"), this, [this] { NavigationPage::openDiagnostics(m_profile, QStringLiteral("chrome://indexeddb-internals")); });
+    diagMenu->addAction(tr("chrome://net-internals"), this, [this] { NavigationPage::openDiagnostics(m_profile, QStringLiteral("chrome://net-internals")); });
+    diagMenu->addAction(tr("chrome://serviceworker-internals"), this, [this] { NavigationPage::openDiagnostics(m_profile, QStringLiteral("chrome://serviceworker-internals")); });
+    diagMenu->addAction(tr("chrome://tracing"), this, [this] { NavigationPage::openDiagnostics(m_profile, QStringLiteral("chrome://tracing")); });
 }
 
 void MainWindow::loadApp()

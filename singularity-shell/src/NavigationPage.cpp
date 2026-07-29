@@ -9,6 +9,7 @@
 #include <QMenuBar>
 #include <QStatusBar>
 #include <QWebEngineCertificateError>
+#include <QWebEnginePage>
 #include <QWebEngineProfile>
 #include <QWebEngineView>
 Q_LOGGING_CATEGORY(lcNav, "shell.nav")
@@ -73,10 +74,12 @@ QWebEnginePage* NavigationPage::createWindow(WebWindowType type)
     quit->setShortcut(QKeySequence::Quit);
 
     QMenu* diagMenu = win->menuBar()->addMenu(tr("&Diagnostics"));
-    diagMenu->addAction(tr("chrome://gpu"), win, [] { openDiagnostics(QStringLiteral("chrome://gpu")); });
-    diagMenu->addAction(tr("chrome://net-internals"), win, [] { openDiagnostics(QStringLiteral("chrome://net-internals")); });
-    diagMenu->addAction(tr("chrome://serviceworker-internals"), win, [] { openDiagnostics(QStringLiteral("chrome://serviceworker-internals")); });
-    diagMenu->addAction(tr("chrome://tracing"), win, [] { openDiagnostics(QStringLiteral("chrome://tracing")); });
+    auto* p = profile();
+    diagMenu->addAction(tr("chrome://gpu"), win, [p] { openDiagnostics(p, QStringLiteral("chrome://gpu")); });
+    diagMenu->addAction(tr("chrome://indexeddb-internals"), win, [p] { openDiagnostics(p, QStringLiteral("chrome://indexeddb-internals")); });
+    diagMenu->addAction(tr("chrome://net-internals"), win, [p] { openDiagnostics(p, QStringLiteral("chrome://net-internals")); });
+    diagMenu->addAction(tr("chrome://serviceworker-internals"), win, [p] { openDiagnostics(p, QStringLiteral("chrome://serviceworker-internals")); });
+    diagMenu->addAction(tr("chrome://tracing"), win, [p] { openDiagnostics(p, QStringLiteral("chrome://tracing")); });
 
     auto* view = new QWebEngineView(win);
     auto* page = new NavigationPage(profile(), /*permissivePopups=*/true,
@@ -98,10 +101,12 @@ QWebEnginePage* NavigationPage::createWindow(WebWindowType type)
     return page;
 }
 
-void NavigationPage::openDiagnostics(const QString& url)
+void NavigationPage::openDiagnostics(QWebEngineProfile* profile, const QString& url)
 {
+    auto* page = new QWebEnginePage(profile);
     auto* view = new QWebEngineView;
     view->setAttribute(Qt::WA_DeleteOnClose);
+    view->setPage(page);
     view->resize(900, 700);
     view->setWindowTitle(QStringLiteral("Diagnostics — ") + url);
     view->load(QUrl(url));

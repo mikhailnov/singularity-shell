@@ -37,6 +37,7 @@ private:
 
     QWebEngineView* m_view = nullptr;
     NavigationPage* m_page = nullptr;
+    QWebEngineProfile* m_profile = nullptr;
     QLabel* m_updateStatus = nullptr;
     QString m_assetVersion;
 };
