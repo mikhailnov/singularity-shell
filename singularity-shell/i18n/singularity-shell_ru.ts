@@ -8,6 +8,18 @@
         <translation>Singularity</translation>
     </message>
     <message>
+        <source>Downloading Singularity…</source>
+        <translation>Загрузка Singularity…</translation>
+    </message>
+    <message>
+        <source>The application assets were not found on this system. They are being downloaded from the official Snap Store right now (one-time, ~43&amp;nbsp;MB extracted). Next launches will work fully offline.</source>
+        <translation>Ресурсы приложения не найдены в системе. Они загружаются из официального Snap Store (однократно, ~43&amp;nbsp;МБ после распаковки). Последующие запуски будут работать полностью автономно.</translation>
+    </message>
+    <message>
+        <source>Connecting…</source>
+        <translation>Подключение…</translation>
+    </message>
+    <message>
         <source>&amp;File</source>
         <translation>&amp;Файл</translation>
     </message>
@@ -39,6 +51,26 @@
         <source>Force reload</source>
         <translation>Перезагрузить</translation>
     </message>
+    <message>
+        <source>&amp;Zoom</source>
+        <translation>&amp;Масштаб</translation>
+    </message>
+    <message>
+        <source>100 %</source>
+        <translation>100 %</translation>
+    </message>
+    <message>
+        <source>Zoom &amp;In</source>
+        <translation>Увеличить</translation>
+    </message>
+    <message>
+        <source>Zoom &amp;Out</source>
+        <translation>Уменьшить</translation>
+    </message>
+    <message>
+        <source>&amp;Reset</source>
+        <translation>&amp;Сбросить</translation>
+    </message>
 </context>
 <context>
     <name>NavigationPage</name>
@@ -49,6 +81,18 @@
     <message>
         <source>Singularity — new window</source>
         <translation>Singularity — новое окно</translation>
+    </message>
+    <message>
+        <source>&amp;File</source>
+        <translation>&amp;Файл</translation>
+    </message>
+    <message>
+        <source>&amp;Quit</source>
+        <translation>&amp;Выход</translation>
+    </message>
+    <message>
+        <source>&amp;Diagnostics</source>
+        <translation>&amp;Диагностика</translation>
     </message>
     <message>
         <source>Force reload</source>

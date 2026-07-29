@@ -129,6 +129,26 @@ void MainWindow::loadApp()
 
 void MainWindow::loadBootstrap()
 {
+    // Inject translated strings after the page loads.
+    connect(m_page, &QWebEnginePage::loadFinished, this, [this](bool ok) {
+        if (!ok || m_page->url().scheme() != QStringLiteral("qrc"))
+            return;
+        const auto jsStr = [](const QString& s) {
+            const QByteArray json = QJsonDocument::fromVariant(
+                QVariantList{QVariant(s)}).toJson(QJsonDocument::Compact);
+            return QString::fromUtf8(json.mid(1, json.size() - 2));
+        };
+        m_page->runJavaScript(QStringLiteral(
+            "var e=document.getElementById('bs-title');"
+            "if(e)e.textContent=") + jsStr(tr("Downloading Singularity…")) + QStringLiteral(";"
+            "e=document.getElementById('bs-body');"
+            "if(e)e.textContent=") + jsStr(tr("The application assets were not found on this system."
+            " They are being downloaded from the official Snap Store right now"
+            " (one-time, ~43\u00A0MB extracted)."
+            " Next launches will work fully offline.")) + QStringLiteral(";"
+            "e=document.getElementById('status');"
+            "if(e)e.textContent=") + jsStr(tr("Connecting…")) + QStringLiteral(";"));
+    }, Qt::SingleShotConnection);
     m_page->load(QUrl(QStringLiteral("qrc:///html/bootstrap.html")));
 }
 
