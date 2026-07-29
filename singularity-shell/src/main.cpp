@@ -225,10 +225,10 @@ int main(int argc, char* argv[])
         using S = UpdateController::State;
         QString text;
         switch (s) {
-        case S::Downloading: text = QStringLiteral("Downloading update %1…").arg(detail); break;
-        case S::Verifying:   text = QStringLiteral("Verifying update %1…").arg(detail); break;
-        case S::Staged:      text = QStringLiteral("Update %1 ready — active on next start").arg(detail); break;
-        case S::Failed:      text = {}; break;  // silent per FR-9 (log only)
+        case S::Downloading: text = MainWindow::tr("Downloading update %1…").arg(detail); break;
+        case S::Verifying:   text = MainWindow::tr("Verifying update %1…").arg(detail); break;
+        case S::Staged:      text = MainWindow::tr("Update %1 ready — active on next start").arg(detail); break;
+        case S::Failed:      text = {}; break;
         default: break;
         }
         window.setUpdateStatus(text);
@@ -236,7 +236,7 @@ int main(int argc, char* argv[])
     QObject::connect(&updater, &UpdateController::progressChanged, &window,
                      [&window](int pct) {
         if (pct >= 0)
-            window.setUpdateStatus(QStringLiteral("Downloading update… %1%").arg(pct));
+            window.setUpdateStatus(MainWindow::tr("Downloading update… %1%").arg(pct));
     });
     // Bootstrap only: once the first asset set is staged, load the app (FR-10).
     if (bootstrap) {
@@ -244,7 +244,7 @@ int main(int argc, char* argv[])
                          [&window, &store, profile](const QString& version, const QString& dir) {
             auto* h = new SgSchemeHandler(dir, profile);
             profile->installUrlSchemeHandler("sg", h);
-            window.setUpdateStatus(QStringLiteral("Version %1 installed — starting…").arg(version));
+            window.setUpdateStatus(MainWindow::tr("Version %1 installed — starting…").arg(version));
             QSettings(settingsPath(), QSettings::IniFormat).setValue(QStringLiteral("runtime/activeAssetDir"), dir);
             window.loadApp();
         });

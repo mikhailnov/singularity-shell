@@ -12,8 +12,8 @@
         <translation>Загрузка Singularity…</translation>
     </message>
     <message>
-        <source>The application assets were not found on this system. They are being downloaded from the official Snap Store right now (one-time, ~43&amp;nbsp;MB extracted). Next launches will work fully offline.</source>
-        <translation>Ресурсы приложения не найдены в системе. Они загружаются из официального Snap Store (однократно, ~43&amp;nbsp;МБ после распаковки). Последующие запуски будут работать полностью автономно.</translation>
+        <source>The application assets were not found on this system. They are being downloaded from the official Snap Store right now (one-time, ~43 MB extracted). Next launches will work fully offline.</source>
+        <translation>Ресурсы приложения не найдены в системе. Они загружаются из официального Snap Store (однократно, ~43 МБ после распаковки). Последующие запуски будут работать полностью автономно.</translation>
     </message>
     <message>
         <source>Connecting…</source>
@@ -70,6 +70,26 @@
     <message>
         <source>&amp;Reset</source>
         <translation>&amp;Сбросить</translation>
+    </message>
+    <message>
+        <source>Downloading update %1…</source>
+        <translation>Загрузка обновления %1…</translation>
+    </message>
+    <message>
+        <source>Verifying update %1…</source>
+        <translation>Проверка обновления %1…</translation>
+    </message>
+    <message>
+        <source>Update %1 ready — active on next start</source>
+        <translation>Обновление %1 готово — применится при следующем запуске</translation>
+    </message>
+    <message>
+        <source>Downloading update… %1%</source>
+        <translation>Загрузка обновления… %1%</translation>
+    </message>
+    <message>
+        <source>Version %1 installed — starting…</source>
+        <translation>Версия %1 установлена — запуск…</translation>
     </message>
 </context>
 <context>

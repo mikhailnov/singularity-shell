@@ -144,7 +144,7 @@ void MainWindow::loadBootstrap()
             "e=document.getElementById('bs-body');"
             "if(e)e.textContent=") + jsStr(tr("The application assets were not found on this system."
             " They are being downloaded from the official Snap Store right now"
-            " (one-time, ~43\u00A0MB extracted)."
+            " (one-time, ~43 MB extracted)."
             " Next launches will work fully offline.")) + QStringLiteral(";"
             "e=document.getElementById('status');"
             "if(e)e.textContent=") + jsStr(tr("Connecting…")) + QStringLiteral(";"));
