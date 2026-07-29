@@ -1,5 +1,6 @@
 #include "PreloadBridge.h"
 
+#include <QDesktopServices>
 #include <QFile>
 #include <QWebChannel>
 #include <QWebEnginePage>
@@ -58,7 +59,20 @@ void PreloadBridge::openExternal(const QString& url)
 
 void PreloadBridge::installOn(QWebEnginePage* page)
 {
-    setParent(page);
+    auto* view = qobject_cast<QWebEngineView*>(page->parent());
+
+    // Connect this page's view to bridge signals so each page closes/minimizes
+    // independently. Qt::UniqueConnection avoids duplicates if called multiple
+    // times for the same page.
+    if (view) {
+        connect(this, &PreloadBridge::minimizeRequested, view, &QWidget::showMinimized, Qt::UniqueConnection);
+        connect(this, &PreloadBridge::maximizeToggleRequested, view, [view] {
+            view->setWindowState(view->windowState() ^ Qt::WindowMaximized);
+        }, Qt::UniqueConnection);
+        connect(this, &PreloadBridge::closeRequested, view, &QWidget::close, Qt::UniqueConnection);
+    }
+    connect(this, &PreloadBridge::externalOpenRequested, this,
+            [](const QUrl& u) { QDesktopServices::openUrl(u); }, Qt::UniqueConnection);
 
     // 1) WebChannel with this object.
     auto* channel = new QWebChannel(page);
@@ -152,7 +166,7 @@ void PreloadBridge::installOn(QWebEnginePage* page)
         setAlwaysOnTop:    function () { return Promise.resolve(null); },
         moveTop:           function () { return Promise.resolve(null); },
         setFullScreen:     function () { return Promise.resolve(null); },
-        OPEN_NEW_WINDOW:       function () { return Promise.resolve(null); },
+        OPEN_NEW_WINDOW:       function () { window.open('sg://renderer/index.html'); return Promise.resolve(null); },
         SET_ERROR_IN_RENDER:   function () { return Promise.resolve(null); },
         SHOW_POMODORO_SETTINGS: function () { return Promise.resolve(null); }
     };
@@ -243,21 +257,6 @@ void PreloadBridge::installOn(QWebEnginePage* page)
                 assetVersion: b.assetVersion
             };
 
-            // Hide the New Window button: it calls OPEN_NEW_WINDOW which opens
-            // a bare window without the PreloadBridge. Until we support proper
-            // multi-window, remove the button from the DOM via a MutationObserver
-            // (the CSS :has() selector is not supported in this Chromium version).
-            var hideNewWindowBtn = function () {
-                var svg = document.querySelector('svg use[href*="new_window"]');
-                if (svg) {
-                    var btn = svg.closest('.toolbar-btn');
-                    if (btn) btn.style.display = 'none';
-                }
-            };
-            document.addEventListener('DOMContentLoaded', function () {
-                hideNewWindowBtn();
-                new MutationObserver(hideNewWindowBtn).observe(document.body, { childList: true, subtree: true });
-            });
         });
     }
 })();

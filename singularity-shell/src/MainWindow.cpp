@@ -28,7 +28,7 @@ MainWindow::MainWindow(QWebEngineProfile* profile, PreloadBridge* bridge,
     resize(1280, 800);
 
     m_view = new QWebEngineView(this);
-    m_page = new NavigationPage(profile, /*permissivePopups=*/false, m_view);
+    m_page = new NavigationPage(profile, /*permissivePopups=*/false, bridge, m_view);
     m_view->setPage(m_page);
     setCentralWidget(m_view);
 
@@ -36,17 +36,10 @@ MainWindow::MainWindow(QWebEngineProfile* profile, PreloadBridge* bridge,
     connect(m_page, &NavigationPage::externalUrlRequested, this,
             [](const QUrl& url) { QDesktopServices::openUrl(url); });
 
-    // Bridge wiring (FR-7).
-    if (bridge) {
+    // Bridge wiring (FR-7). Signal connections are now set up per-page in
+    // installOn(), so each window (main + popups) controls itself.
+    if (bridge)
         bridge->installOn(m_page);
-        connect(bridge, &PreloadBridge::minimizeRequested, this, &QWidget::showMinimized);
-        connect(bridge, &PreloadBridge::maximizeToggleRequested, this, [this] {
-            setWindowState(windowState() ^ Qt::WindowMaximized);
-        });
-        connect(bridge, &PreloadBridge::closeRequested, this, &QWidget::close);
-        connect(bridge, &PreloadBridge::externalOpenRequested, this,
-                [](const QUrl& u) { QDesktopServices::openUrl(u); });
-    }
 
     // Non-intrusive update indicator in the status bar (FR-9: no popups).
     m_updateStatus = new QLabel(this);

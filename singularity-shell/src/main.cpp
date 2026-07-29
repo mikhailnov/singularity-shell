@@ -205,9 +205,9 @@ int main(int argc, char* argv[])
     });
 
     // --- Main window + bridge --------------------------------------------------
-    // Heap-allocated: installOn() reparents the bridge to the web page, which
-    // would otherwise delete a stack object on shutdown.
-    auto* bridge = new PreloadBridge;
+    // Heap-allocated with parent &app: installOn() may be called for multiple
+    // pages (main window + popups), so the bridge must not be reparented.
+    auto* bridge = new PreloadBridge(&app);
     bridge->setVersions(QStringLiteral(APP_VERSION),
                         bootstrap ? QString() : active.version);
 

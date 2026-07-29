@@ -1,4 +1,5 @@
 #include "NavigationPage.h"
+#include "PreloadBridge.h"
 
 #include <QWebEngineCertificateError>
 #include <QWebEngineProfile>
@@ -8,12 +9,11 @@
 Q_LOGGING_CATEGORY(lcNav, "shell.nav")
 
 NavigationPage::NavigationPage(QWebEngineProfile* profile, bool permissivePopups,
-                               QObject* parent)
+                               PreloadBridge* bridge, QObject* parent)
     : QWebEnginePage(profile, parent)
     , m_permissive(permissivePopups)
+    , m_bridge(bridge)
 {
-    // Qt 6: certificate errors arrive via a signal; the default action is to
-    // reject — we just log (never silently accept).
     connect(this, &QWebEnginePage::certificateError, this,
             [](const QWebEngineCertificateError& error) {
         qCWarning(lcNav) << "certificate error for" << error.url()
@@ -35,21 +35,18 @@ bool NavigationPage::acceptNavigationRequest(const QUrl& url, NavigationType typ
     const QString scheme = url.scheme();
 
     if (scheme == QStringLiteral("sg"))
-        return true;                       // our shell origin
+        return true;
     if (scheme == QStringLiteral("qrc"))
-        return true;                       // built-in pages (bootstrap, FR-10)
+        return true;
     if (scheme != QStringLiteral("https") && scheme != QStringLiteral("http"))
-        return false;                      // unknown schemes: ignore (deep links, P-3)
+        return false;
 
     if (m_permissive)
-        return true;                       // auth popups: let OAuth chains run
+        return true;
 
     if (isVendorHost(url.host()))
         return true;
 
-    // External hosts from the main page: delegate link-clicks to the system
-    // browser; allow everything else (redirects, subresources are not routed
-    // through here for http(s) anyway).
     if (type == NavigationTypeLinkClicked && isMainFrame) {
         emit externalUrlRequested(url);
         return false;
@@ -60,20 +57,23 @@ bool NavigationPage::acceptNavigationRequest(const QUrl& url, NavigationType typ
 QWebEnginePage* NavigationPage::createWindow(WebWindowType type)
 {
     Q_UNUSED(type);
-    // Auth / dialog popups must share the profile (cookies, window.opener) —
-    // FR-6. Create a real top-level view hosting a permissive page so OAuth
-    // redirect chains and window.opener work end to end.
     auto* view = new QWebEngineView;
     view->setAttribute(Qt::WA_DeleteOnClose);
-    view->resize(520, 720);
+    view->resize(1024, 768);
 
-    auto* page = new NavigationPage(profile(), /*permissivePopups=*/true, view);
+    auto* page = new NavigationPage(profile(), /*permissivePopups=*/true,
+                                    m_bridge, view);
     view->setPage(page);
+
+    // Install the bridge so window.preloadApi is available in the new window.
+    if (m_bridge)
+        m_bridge->installOn(page);
+
     QObject::connect(page, &QWebEnginePage::windowCloseRequested,
                      view, &QWidget::close);
-    view->setWindowTitle(tr("Singularity — sign in"));
+    view->setWindowTitle(tr("Singularity — new window"));
     view->show();
-    qCDebug(lcNav) << "auth/dialog popup opened";
+    qCDebug(lcNav) << "popup/new-window opened";
     return page;
 }
 
