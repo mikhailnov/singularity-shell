@@ -68,10 +68,14 @@ QWebEnginePage* NavigationPage::createWindow(WebWindowType type)
     win->resize(1024, 768);
     win->statusBar()->hide();
 
-    // "File" menu matching the main window.
     QMenu* menu = win->menuBar()->addMenu(tr("&File"));
     QAction* quit = menu->addAction(tr("&Quit"), win, &QWidget::close);
     quit->setShortcut(QKeySequence::Quit);
+
+    QMenu* diagMenu = win->menuBar()->addMenu(tr("&Diagnostics"));
+    diagMenu->addAction(tr("chrome://gpu"), win, [] {
+        openDiagnostics();
+    });
 
     auto* view = new QWebEngineView(win);
     auto* page = new NavigationPage(profile(), /*permissivePopups=*/true,
@@ -91,6 +95,16 @@ QWebEnginePage* NavigationPage::createWindow(WebWindowType type)
     win->show();
     qCDebug(lcNav) << "new window opened";
     return page;
+}
+
+void NavigationPage::openDiagnostics()
+{
+    auto* view = new QWebEngineView;
+    view->setAttribute(Qt::WA_DeleteOnClose);
+    view->resize(900, 700);
+    view->setWindowTitle(QStringLiteral("Diagnostics — chrome://gpu"));
+    view->load(QUrl(QStringLiteral("chrome://gpu")));
+    view->show();
 }
 
 

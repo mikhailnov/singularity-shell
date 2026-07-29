@@ -76,6 +76,11 @@ void MainWindow::buildMenus()
     QAction* quit = appMenu->addAction(tr("&Quit"), qApp, &QApplication::quit);
     quit->setShortcut(QKeySequence::Quit);
     quit->setMenuRole(QAction::QuitRole);
+
+    QMenu* diagMenu = menuBar()->addMenu(tr("&Diagnostics"));
+    diagMenu->addAction(tr("chrome://gpu"), this, [] {
+        NavigationPage::openDiagnostics();
+    });
 }
 
 void MainWindow::loadApp()

@@ -23,6 +23,9 @@ public:
                             PreloadBridge* bridge = nullptr,
                             QObject* parent = nullptr);
 
+    // Opens a bare diagnostic window loading chrome://gpu.
+    static void openDiagnostics();
+
     static bool isVendorHost(const QString& host);
 
 signals:
