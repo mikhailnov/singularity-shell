@@ -260,3 +260,11 @@ docs/           printing.md — почему не работает печать 
 | `~/.local/share/singularity-shell/assets/` | Ресурсы фонового обновления (версионированы, symlink `current`) |
 | `~/.local/share/singularity-shell/profile/` | Cookies, IndexedDB, SW, кеш |
 | `~/.local/share/singularity-shell/settings.conf` | Состояние UI, масштаб, временные метки updater |
+
+## Обратная связь
+
+Сообщения об ошибках, патчи и пулл-реквесты принимаются через
+[GitHub Issues](https://github.com/mikhailnov/singularity-shell/issues)
+и по почте: [m@mikhailnov.ru](mailto:m@mikhailnov.ru).
+
+[English README (Английский)](README.en.md)

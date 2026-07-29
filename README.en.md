@@ -256,3 +256,11 @@ docs/           printing.md — why plan-of-the-day print does not work
 | `~/.local/share/singularity-shell/assets/` | Background-updated assets (versioned, `current` symlink) |
 | `~/.local/share/singularity-shell/profile/` | Cookies, IndexedDB, SW, cache |
 | `~/.local/share/singularity-shell/settings.conf` | UI state, zoom, updater timestamps |
+
+## Contributing
+
+Bug reports, patches, and pull requests are welcome via
+[GitHub Issues](https://github.com/mikhailnov/singularity-shell/issues)
+or email: [m@mikhailnov.ru](mailto:m@mikhailnov.ru).
+
+[Russian README (Русский)](README.md)
