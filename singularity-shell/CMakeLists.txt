@@ -22,6 +22,7 @@ find_package(Qt6 6.5 REQUIRED COMPONENTS
     WebEngineCore
     WebEngineWidgets
     WebChannel
+    LinguistTools
 )
 qt_standard_project_setup()
 
@@ -64,6 +65,16 @@ target_link_libraries(singularity-shell PRIVATE
     Qt6::WebEngineWidgets
     Qt6::WebChannel
 )
+# --- Translations: compile .ts → .qm (TS is hand-maintained) -------------------
+# Kept in i18n/ (non-standard) so qt_standard_project_setup does not auto-run
+# lupdate and overwrite the hand-edited file. qt_add_lrelease only compiles;
+# the tool path is auto-discovered via the already-found Qt6LinguistTools.
+qt_add_lrelease(singularity-shell
+    TS_FILES i18n/singularity-shell_ru.ts
+    QM_FILES_OUTPUT_VARIABLE qm_files
+)
+install(FILES ${qm_files}
+        DESTINATION ${SINGULARITY_SHELL_DATADIR}/translations)
 
 # --- asar-extract: tiny dependency-free CLI used by fetch-assets.sh ----------
 add_executable(asar-extract tools/asar-extract.cpp)

@@ -8,20 +8,19 @@ class QWebEnginePage;
 // PreloadBridge — replacement for the vendor's Electron `window.preloadApi`
 // bridge, per qt-tz.md FR-7 / §6.5.
 //
-// Two layers:
-//  1) an injected JS stub (DocumentCreation, main world) that defines
-//     window.preloadApi as a Proxy of safe async no-ops, so vendor code paths
-//     touching desktop IPC never throw;
-//  2) a QWebChannel object ("preloadBridge") backing the small set of
-//     operations we deliberately support (window controls, zoom, about info).
+// The C++ side exposes slots that the JS stub wires into controller objects
+// matching the vendor's actual Electron preload API surface (reverse-engineered
+// from build/main/preload.js in the official snap). Each controller mirrors the
+// names the vendor app expects, so vendor code paths never throw or hang.
 //
-// The JS stub Object.assign()s the real implementations onto the proxy target
-// once the channel is ready; everything else stays a logged no-op.
+// Sync methods (e.g. isMaximized, zoomFactor) use Q_PROPERTY so QWebChannel
+// serves them synchronously; async actions use slots.
 class PreloadBridge : public QObject
 {
     Q_OBJECT
     Q_PROPERTY(QString appVersion READ appVersion CONSTANT)
     Q_PROPERTY(QString assetVersion READ assetVersion CONSTANT)
+    Q_PROPERTY(bool isMaximized READ isMaximized NOTIFY maximizedChanged)
 public:
     explicit PreloadBridge(QObject* parent = nullptr);
 
@@ -30,25 +29,34 @@ public:
     QString appVersion() const { return m_appVersion; }
     QString assetVersion() const { return m_assetVersion; }
 
+    // Sync getter exposed as Q_PROPERTY for the vendor's windowController.isMaximized.
+    bool isMaximized() const;
+
     // Injected by MainWindow on the main page (and popup pages) at startup.
     void installOn(QWebEnginePage* page);
 
-    // JS-callable surface (QWebChannel slots). Keep names stable.
+    // --- Async slots (QWebChannel → JS Promise) ---
+    // These are wired into controller objects matching the vendor's API:
+    //   windowController: minimize, maximize, unmaximize, close
+    //   zoomController:   zoomIn, zoomOut, zoomReset
+    //   urlController:    openExternal
 public slots:
     void windowMinimize();
-    void windowMaximizeToggle();
+    void windowMaximize();
+    void windowUnmaximize();
     void windowClose();
-    void setZoomFactor(double factor);
+    void zoomIn();
+    void zoomOut();
+    void zoomReset();
     double zoomFactor() const;
     void openExternal(const QString& url);
 
 signals:
-    // Requested by JS; MainWindow performs the action.
     void minimizeRequested();
     void maximizeToggleRequested();
     void closeRequested();
-    void zoomChangeRequested(double factor);
     void externalOpenRequested(const QUrl& url);
+    void maximizedChanged();
 
 private:
     QString m_appVersion;

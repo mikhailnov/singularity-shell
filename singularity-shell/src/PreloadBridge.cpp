@@ -5,7 +5,7 @@
 #include <QWebEnginePage>
 #include <QWebEngineScript>
 #include <QWebEngineScriptCollection>
-#include <QWebEngineSettings>
+#include <QWebEngineView>
 
 PreloadBridge::PreloadBridge(QObject* parent) : QObject(parent) {}
 
@@ -15,17 +15,45 @@ void PreloadBridge::setVersions(QString appVer, QString assetVer)
     m_assetVersion = std::move(assetVer);
 }
 
-void PreloadBridge::windowMinimize()        { emit minimizeRequested(); }
-void PreloadBridge::windowMaximizeToggle()  { emit maximizeToggleRequested(); }
-void PreloadBridge::windowClose()           { emit closeRequested(); }
-void PreloadBridge::setZoomFactor(double f) { emit zoomChangeRequested(f); }
-void PreloadBridge::openExternal(const QString& url) { emit externalOpenRequested(QUrl(url)); }
+bool PreloadBridge::isMaximized() const
+{
+    if (auto* p = qobject_cast<QWebEnginePage*>(parent())) {
+        if (auto* view = qobject_cast<QWebEngineView*>(p->parent()))
+            return view->isMaximized();
+    }
+    return false;
+}
 
+void PreloadBridge::windowMinimize()   { emit minimizeRequested(); }
+void PreloadBridge::windowMaximize()   { emit maximizeToggleRequested(); }
+void PreloadBridge::windowUnmaximize() { emit maximizeToggleRequested(); }
+void PreloadBridge::windowClose()      { emit closeRequested(); }
+
+void PreloadBridge::zoomIn()
+{
+    if (auto* p = qobject_cast<QWebEnginePage*>(parent()))
+        p->setZoomFactor(qBound(0.25, p->zoomFactor() + 0.1, 5.0));
+}
+void PreloadBridge::zoomOut()
+{
+    if (auto* p = qobject_cast<QWebEnginePage*>(parent()))
+        p->setZoomFactor(qBound(0.25, p->zoomFactor() - 0.1, 5.0));
+}
+void PreloadBridge::zoomReset()
+{
+    if (auto* p = qobject_cast<QWebEnginePage*>(parent()))
+        p->setZoomFactor(1.0);
+}
 double PreloadBridge::zoomFactor() const
 {
     if (auto* p = qobject_cast<QWebEnginePage*>(parent()))
         return p->zoomFactor();
     return 1.0;
+}
+
+void PreloadBridge::openExternal(const QString& url)
+{
+    emit externalOpenRequested(QUrl(url));
 }
 
 void PreloadBridge::installOn(QWebEnginePage* page)
@@ -37,9 +65,7 @@ void PreloadBridge::installOn(QWebEnginePage* page)
     channel->registerObject(QStringLiteral("preloadBridge"), this);
     page->setWebChannel(channel);
 
-    // 2) Inject stub + channel bootstrap at document creation, main world.
-    //    qwebchannel.js is inlined into the script source: loading it as a
-    //    subresource from qrc:// would be cross-origin for the sg:// page.
+    // 2) Inject qwebchannel.js + stub + CSS at document creation, main world.
     QFile qc(QStringLiteral(":/qtwebchannel/qwebchannel.js"));
     QString qwebchannelJs;
     if (qc.open(QIODevice::ReadOnly))
@@ -48,59 +74,188 @@ void PreloadBridge::installOn(QWebEnginePage* page)
     const QString stubJs = qwebchannelJs + QStringLiteral(R"JS(
 ;(function () {
     'use strict';
-    var logged = {};
-    // Universal recursive stub: any property chain is truthy and any call is
-    // an async no-op. The vendor renderer treats "preloadApi exists" as
-    // "desktop build" and uses e.g. preloadApi.ipcRenderer.send(...) — with a
-    // plain-function stub those chains threw (TypeError: ...send is not a
-    // function); with the recursive proxy they resolve to logged no-ops.
-    function makeUniversal(path) {
-        var fn = function () {};
-        return new Proxy(fn, {
-            get: function (t, prop) {
-                if (prop === '__isStub') return true;
-                if (prop === 'then') return undefined;        // never a thenable
-                if (prop === Symbol.toPrimitive) return function () { return ''; };
-                if (prop in t) return t[prop];                // real impls assigned below
-                return makeUniversal(path + '.' + String(prop));
-            },
-            apply: function (t, thisArg, args) {
-                if (!logged[path]) {
-                    logged[path] = 1;
-                    console.warn('[singularity-shell] preloadApi stub call:', path, args);
-                }
-                return Promise.resolve(null);
-            },
-            set: function (t, prop, value) { t[prop] = value; return true; }
-        });
-    }
-    var target = {};                    // real implementations land here
-    var stubRoot = makeUniversal('preloadApi');
-    window.preloadApi = new Proxy(stubRoot, {
-        get: function (s, prop) {
-            if (prop in target) return target[prop];
-            if (prop === '__isStub') return true;
-            if (prop === 'then') return undefined;
-            return stubRoot[prop];
-        },
-        set: function (s, prop, value) { target[prop] = value; return true; }
-    });
-    window.IS_TEST = false;
 
+    // --- CSS: hide window-control buttons (Qt provides native decorations) ---
+    var style = document.createElement('style');
+    style.textContent = '.win-top-panel { display: none !important; }';
+    document.addEventListener('DOMContentLoaded', function () {
+        (document.head || document.documentElement).appendChild(style);
+    });
+
+    // --- Helper: async wrapper that returns a Promise ---
+    function wrapAsync(fn) {
+        return function () {
+            return new Promise(function (resolve) {
+                fn.apply(this, arguments);
+                resolve(null);
+            });
+        };
+    }
+
+    // --- Helper: sync getter via QWebChannel property ---
+    function wrapSync(getter) {
+        return function () { return getter(); };
+    }
+
+    // --- Default stubs for every controller ---
+    // Each method is an async no-op returning Promise<null> unless overridden.
+    function makeStubController(methods) {
+        var c = {};
+        methods.forEach(function (m) {
+            c[m] = function () { return Promise.resolve(null); };
+        });
+        return c;
+    }
+
+    // --- ipcRenderer stub (fully sufficient for vendor's needs) ---
+    var ipcStub = {
+        send: function () {},
+        on:   function () { return function () {}; },
+        off:  function () {}
+    };
+
+    // --- Remaining controller stubs ---
+    var stubs = {
+        appController:            makeStubController(['QUIT_APP','RESTART_APP','WORKERS_LANGUAGE','SPELLCHECK_ENABLED','SPELLCHECK_IS_ENABLED']),
+        fileController:           makeStubController(['open','clear']),
+        deepLinkController:       makeStubController(['APP_OPEN_URL']),
+        purchaseController:       makeStubController(['fetchTariffs','initStoreListeners','purchase','purchaseRestore','disposeStoreListeners']),
+        updateController:         makeStubController(['applyUpdateAndRestart','checkUpdates']),
+        badgeController:          makeStubController(['BADGE_COUNT_CHANGE']),
+        diskSpaceCheckerController: makeStubController(['isLowSpace']),
+        quickEntryController:     makeStubController(['QUICK_ENTRY_REGISTER']),
+        popupController:          makeStubController(['isVisible','open','setBounds','sendResult','close','onPopupControllerReady','updatePosition','focus']),
+        saveFileDialogController: makeStubController(['saveFile']),
+        clipboardController:      makeStubController(['clear','readText','readHTML','write','broadcastCopyCut','setContextMenuIsQuill']),
+        dndController:            makeStubController(['REMOVE_CHECKLIST_FROM_EDITOR','DRAG_START','DRAG_END']),
+        fetchController:          { fetch: function (url, options) { return window.fetch(url, options).then(function (r) { return r.arrayBuffer().then(function (body) { return { body: body, status: r.status, statusText: r.statusText, headers: Array.from(r.headers.entries()) }; }); }); } },
+        backupController:         makeStubController(['GET_LOG_FILE_WITH_OBFUSCATED_BACKUP','GET_RAW_BACKUP']),
+        importController:         makeStubController(['IMPORT_THINGS','IMPORT_OMNIFOCUS','IMPORT_TICKTICK','IMPORT_CSV','IMPORT_TODOIST','IMPORT_EVERNOTE','IMPORT_NOTION']),
+        menuController:           makeStubController(['TOOLBAR_UPDATED','SHOW_MAIN_MENU_AS_POPUP_MENU','POPUP_MENU'])
+    };
+
+    // --- windowController (defined first — bridge depends on it) ---
+    var wcStub = {
+        getId:         function () { return 1; },
+        isVisible:     function () { return true; },
+        isFocused:     function () { return true; },
+        isMaximized:   function () { return false; },
+        isFullScreen:  function () { return false; },
+        minimize:          function () { return Promise.resolve(null); },
+        maximize:          function () { return Promise.resolve(null); },
+        unmaximize:        function () { return Promise.resolve(null); },
+        close:             function () { return Promise.resolve(null); },
+        hide:              function () { return Promise.resolve(null); },
+        show:              function () { return Promise.resolve(null); },
+        focus:             function () { return Promise.resolve(null); },
+        blur:              function () { return Promise.resolve(null); },
+        setAlwaysOnTop:    function () { return Promise.resolve(null); },
+        moveTop:           function () { return Promise.resolve(null); },
+        setFullScreen:     function () { return Promise.resolve(null); },
+        OPEN_NEW_WINDOW:       function () { window.open('sg://renderer/index.html'); return Promise.resolve(null); },
+        SET_ERROR_IN_RENDER:   function () { return Promise.resolve(null); },
+        SHOW_POMODORO_SETTINGS: function () { return Promise.resolve(null); }
+    };
+
+    // Spreads wcStub methods so provider.window.focus() etc. work,
+    // plus getPosition/getBounds/addListener from ipcRenderer.
+    var winBridge = {
+        getId:         wcStub.getId,
+        isVisible:     wcStub.isVisible,
+        isFocused:     wcStub.isFocused,
+        isMaximized:   wcStub.isMaximized,
+        isFullScreen:  wcStub.isFullScreen,
+        minimize:      wcStub.minimize,
+        maximize:      wcStub.maximize,
+        unmaximize:    wcStub.unmaximize,
+        close:         wcStub.close,
+        hide:          wcStub.hide,
+        show:          wcStub.show,
+        focus:         wcStub.focus,
+        blur:          wcStub.blur,
+        setAlwaysOnTop: wcStub.setAlwaysOnTop,
+        moveTop:       wcStub.moveTop,
+        setFullScreen: wcStub.setFullScreen,
+        OPEN_NEW_WINDOW:       wcStub.OPEN_NEW_WINDOW,
+        SET_ERROR_IN_RENDER:   wcStub.SET_ERROR_IN_RENDER,
+        SHOW_POMODORO_SETTINGS: wcStub.SHOW_POMODORO_SETTINGS,
+        getPosition: function () { return [window.screenLeft, window.screenTop]; },
+        getBounds:   function () { return { x: window.screenLeft, y: window.screenTop, width: window.innerWidth, height: window.innerHeight }; },
+        addListener: function (ch, cb) { return ipcStub.on(ch, cb); },
+        id: 1
+    };
+
+    // --- Assemble preloadApi ---
+    window.preloadApi = {
+        getPathForFile: function () { return undefined; },
+        ipcRenderer:    ipcStub,
+        isPopup:        false,
+        renderer:       ipcStub,
+        windowRenderToMainBridge: winBridge,
+        windowController: wcStub,
+        zoomController: {
+            ZOOM_IN:   function () { return Promise.resolve(null); },
+            ZOOM_OUT:  function () { return Promise.resolve(null); },
+            ZOOM_RESET: function () { return Promise.resolve(null); }
+        },
+        urlController: {
+            openExternal:     function (url) { window.open(url, '_blank'); return Promise.resolve(null); },
+            openPath:         function () { return Promise.resolve(null); },
+            supportsOpenPath: function () { return Promise.resolve(false); }
+        }
+    };
+
+    // Merge remaining stubs
+    Object.keys(stubs).forEach(function (k) { window.preloadApi[k] = stubs[k]; });
+
+    // --- Wire QWebChannel → real implementations override the stubs ---
     if (typeof QWebChannel !== 'undefined' && typeof qt !== 'undefined'
             && qt.webChannelTransport) {
         new QWebChannel(qt.webChannelTransport, function (channel) {
             var b = channel.objects.preloadBridge;
             if (!b) return;
-            // Real implementations backed by the C++ PreloadBridge: they land
-            // in `target` and shadow the recursive stub for these names.
-            target.windowMinimize       = function () { b.windowMinimize(); };
-            target.windowMaximizeToggle = function () { b.windowMaximizeToggle(); };
-            target.windowClose          = function () { b.windowClose(); };
-            target.setZoomFactor        = function (f) { b.setZoomFactor(f); };
-            target.getZoomFactor        = function () { return b.zoomFactor; };
-            target.openExternal         = function (u) { b.openExternal(u); };
-            target.shellInfo = { appVersion: b.appVersion, assetVersion: b.assetVersion };
+
+            // Window controller: async actions
+            var wc = window.preloadApi.windowController;
+            wc.minimize   = wrapAsync(function () { b.windowMinimize(); });
+            wc.maximize   = wrapAsync(function () { b.windowMaximize(); });
+            wc.unmaximize = wrapAsync(function () { b.windowUnmaximize(); });
+            wc.close      = wrapAsync(function () { b.windowClose(); });
+            wc.isMaximized = function () { return b.isMaximized; };
+
+            // Zoom controller
+            var zc = window.preloadApi.zoomController;
+            zc.ZOOM_IN   = wrapAsync(function () { b.zoomIn(); });
+            zc.ZOOM_OUT  = wrapAsync(function () { b.zoomOut(); });
+            zc.ZOOM_RESET = wrapAsync(function () { b.zoomReset(); });
+
+            // URL controller: real openExternal
+            var uc = window.preloadApi.urlController;
+            uc.openExternal = wrapAsync(function (url) { b.openExternal(url); });
+
+            // App controller: QUIT_APP → window.close()
+            var ac = window.preloadApi.appController;
+            ac.QUIT_APP = wrapAsync(function () { b.windowClose(); });
+
+            // Shell info
+            window.preloadApi.shellInfo = {
+                appVersion:   b.appVersion,
+                assetVersion: b.assetVersion
+            };
+
+            // Hide the New Window button: it calls OPEN_NEW_WINDOW which opens
+            // a bare window without the PreloadBridge. Until we support proper
+            // multi-window, remove the button from the DOM.
+            var css2 = document.createElement('style');
+            // The New Window toolbar button renders an SVG icon named "new_window".
+            // Its parent button is inside header-top__toolbar. Hide it.
+            css2.textContent =
+                '.header-top__toolbar button:has(svg use[href*="new_window"])' +
+                ' { display: none !important; }';
+            document.addEventListener('DOMContentLoaded', function () {
+                var h = document.head || document.documentElement;
+                h.appendChild(css2);
+            });
         });
     }
 })();

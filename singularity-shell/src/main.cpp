@@ -7,10 +7,13 @@
 #include <QDir>
 #include <QFileDialog>
 #include <QFileInfo>
+#include <QLibraryInfo>
+#include <QLocale>
 #include <QLoggingCategory>
 #include <QSettings>
 #include <QStandardPaths>
 #include <QTimer>
+#include <QTranslator>
 #include <QVariant>
 #include <QWebEngineDownloadRequest>
 #include <QWebEngineProfile>
@@ -86,6 +89,27 @@ int main(int argc, char* argv[])
     }
 
     QApplication app(argc, argv);
+
+    // --- Translations (qt-tz.md §6.9) -----------------------------------------
+    // Qt's own dialogs first, then our strings.
+    QTranslator qtTranslator;
+    if (qtTranslator.load(QLocale(), QStringLiteral("qt"), QStringLiteral("_"),
+                          QLibraryInfo::path(QLibraryInfo::TranslationsPath)))
+        app.installTranslator(&qtTranslator);
+
+    QTranslator appTranslator;
+    const QStringList tsPaths = {
+        QStringLiteral(SINGULARITY_SHELL_DATADIR) + QStringLiteral("/translations"),
+        QCoreApplication::applicationDirPath() + QStringLiteral("/../translations"),
+        QCoreApplication::applicationDirPath() + QStringLiteral("/translations"),
+    };
+    for (const QString& p : tsPaths) {
+        if (appTranslator.load(QLocale(), QStringLiteral("singularity-shell"),
+                               QStringLiteral("_"), p)) {
+            app.installTranslator(&appTranslator);
+            break;
+        }
+    }
 
     QCommandLineParser parser;
     parser.setApplicationDescription(

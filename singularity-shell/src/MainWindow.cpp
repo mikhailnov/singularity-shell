@@ -24,7 +24,7 @@ MainWindow::MainWindow(QWebEngineProfile* profile, PreloadBridge* bridge,
     : QMainWindow(parent)
     , m_assetVersion(assetVersion)
 {
-    setWindowTitle(QStringLiteral("Singularity"));
+    setWindowTitle(tr("Singularity"));
     resize(1280, 800);
 
     m_view = new QWebEngineView(this);
@@ -44,8 +44,6 @@ MainWindow::MainWindow(QWebEngineProfile* profile, PreloadBridge* bridge,
             setWindowState(windowState() ^ Qt::WindowMaximized);
         });
         connect(bridge, &PreloadBridge::closeRequested, this, &QWidget::close);
-        connect(bridge, &PreloadBridge::zoomChangeRequested, this,
-                [this](double f) { m_page->setZoomFactor(qBound(0.25, f, 5.0)); });
         connect(bridge, &PreloadBridge::externalOpenRequested, this,
                 [](const QUrl& u) { QDesktopServices::openUrl(u); });
     }
@@ -102,12 +100,17 @@ void MainWindow::setUpdateStatus(const QString& text)
     m_updateStatus->setVisible(!text.isEmpty());
 
     // Bootstrap page progress (FR-10): forward to the page if it is showing.
+    // Use JSON.stringify for safe JS string escaping — never concatenate
+    // raw user-facing text into a <script> context.
     if (m_page->url().scheme() == QStringLiteral("qrc")) {
-        const QString jsText = QString::fromUtf8(
-            QJsonDocument::fromVariant(text).toJson(QJsonDocument::Compact));  // quoted+escaped
+        const QByteArray safe = QJsonDocument::fromVariant(
+            QVariantList{QVariant(text)}).toJson(QJsonDocument::Compact);
+        // safe is now ["..."] with properly escaped content.
+        // Extract just the inner string by stripping the array brackets.
+        const QByteArray inner = safe.mid(1, safe.size() - 2);
         m_page->runJavaScript(QStringLiteral(
             "var e=document.getElementById('status');"
-            "if(e){e.textContent=") + jsText + QStringLiteral(";}"));
+            "if(e){e.textContent=") + QString::fromUtf8(inner) + QStringLiteral(";}"));
     }
 }
 
