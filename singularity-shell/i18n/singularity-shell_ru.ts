@@ -31,12 +31,20 @@
         <source>none (bootstrap)</source>
         <translation>нет (загрузка)</translation>
     </message>
+    <message>
+        <source>&amp;Diagnostics</source>
+        <translation>&amp;Диагностика</translation>
+    </message>
 </context>
 <context>
     <name>NavigationPage</name>
     <message>
         <source>Singularity — sign in</source>
         <translation>Singularity — вход</translation>
+    </message>
+    <message>
+        <source>Singularity — new window</source>
+        <translation>Singularity — новое окно</translation>
     </message>
 </context>
 </TS>
