@@ -2,6 +2,7 @@
 #include "PreloadBridge.h"
 
 #include <QAction>
+#include <QDesktopServices>
 #include <QKeySequence>
 #include <QLoggingCategory>
 #include <QMainWindow>
@@ -53,11 +54,16 @@ bool NavigationPage::acceptNavigationRequest(const QUrl& url, NavigationType typ
     if (isVendorHost(url.host()))
         return true;
 
-    // Everything else: open in the system browser, regardless of frame type.
+    // OAuth providers used by the vendor (verified in app.bundle.js).
+    if (url.host().contains(QStringLiteral("accounts.google.com"))
+        || url.host().contains(QStringLiteral("appleid.apple.com"))
+        || url.host().contains(QStringLiteral("login.microsoftonline.com")))
+        return true;
+
+    // Everything else: open in the system browser.
     emit externalUrlRequested(url);
     return false;
 }
-
 QWebEnginePage* NavigationPage::createWindow(WebWindowType type)
 {
     Q_UNUSED(type);
@@ -67,7 +73,7 @@ QWebEnginePage* NavigationPage::createWindow(WebWindowType type)
     win->statusBar()->hide();
 
     auto* view = new QWebEngineView(win);
-    auto* page = new NavigationPage(profile(), /*permissivePopups=*/true,
+    auto* page = new NavigationPage(profile(), /*permissivePopups=*/false,
                                     /*bridge=*/nullptr, view);
     view->setPage(page);
     win->setCentralWidget(view);
@@ -77,6 +83,13 @@ QWebEnginePage* NavigationPage::createWindow(WebWindowType type)
     popupBridge->setVersions(m_bridge ? m_bridge->appVersion() : QString(),
                              m_bridge ? m_bridge->assetVersion() : QString());
     popupBridge->installOn(page);
+
+    // External URLs from popups: open in system browser, close the popup.
+    QObject::connect(page, &NavigationPage::externalUrlRequested, win,
+                     [win](const QUrl& url) {
+        QDesktopServices::openUrl(url);
+        win->close();
+    });
 
     // Menus (after page is created so lambdas can capture it).
     QMenu* menu = win->menuBar()->addMenu(tr("&File"));

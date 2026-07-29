@@ -54,7 +54,8 @@ double PreloadBridge::zoomFactor() const
 
 void PreloadBridge::openExternal(const QString& url)
 {
-    emit externalOpenRequested(QUrl(url));
+    if (!url.isEmpty())
+        emit externalOpenRequested(QUrl(url));
 }
 void PreloadBridge::installOn(QWebEnginePage* page)
 {
@@ -242,8 +243,12 @@ void PreloadBridge::installOn(QWebEnginePage* page)
 
             // URL controller: real openExternal
             var uc = window.preloadApi.urlController;
-            uc.openExternal = wrapAsync(function (url) { b.openExternal(url); });
-
+            uc.openExternal = function (url) {
+                // QWebChannel requires an explicit String() cast for argument
+                // serialization; passing the raw value may produce an empty call.
+                b.openExternal(String(url));
+                return Promise.resolve(null);
+            };
             // App controller: QUIT_APP → window.close()
             var ac = window.preloadApi.appController;
             ac.QUIT_APP = wrapAsync(function () { b.windowClose(); });

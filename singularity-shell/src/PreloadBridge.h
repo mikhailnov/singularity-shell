@@ -49,8 +49,10 @@ public slots:
     void zoomOut();
     void zoomReset();
     double zoomFactor() const;
-    void openExternal(const QString& url);
-
+    // Default parameter: QMetaObject registers both openExternal() and
+    // openExternal(QString). Needed because the vendor occasionally calls
+    // it with no arguments, and QWebChannel requires an exact signature match.
+    void openExternal(const QString& url = QString());
 signals:
     void minimizeRequested();
     void maximizeToggleRequested();
