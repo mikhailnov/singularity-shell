@@ -3,50 +3,15 @@
 Offline-capable **Qt 6 / QtWebEngine** wrapper for [SingularityApp](https://web.singularity-app.com/)
 — no snapd, no third-party browser binaries. Design document: `qt-tz.md`.
 
-> ✅ **Build status:** compiled and smoke-tested on **ROSA Fresh 13.2,
-> Qt 6.11.1** (systemd-nspawn container, offscreen). Validated there:
->
-> - offline **cold start**: with DNS blackholed the full UI renders from local
->   assets (acceptance test A-1, minus real account data — no login was done);
-> - the app **self-registers its service worker** on `sg://renderer` and
->   populates IndexedDB (`AppDatabase`, `SingularityLogs3`); registrations
->   persist across restarts;
-> - **cloud API transport works end-to-end**: the login flow's first server
->   call (`POST /singularity.api.Service/CanRegister` on
->   `proxy1.singularity-app.com`) returns `200` and the UI advances to the
->   password step (tested with a fake email; real credentials not tried);
-> - the **bootstrap page** renders during first-run asset download
->   (`qrc:///html/bootstrap.html`);
-> - the **background updater** runs: Snap Store check → "up to date 12.5.0
->   r145" (download/verify/stage path is exercised by `fetch-assets.sh`,
->   which is tested end-to-end incl. SHA3-384);
-> - asset pipeline (`tools/asar-extract.cpp`, `scripts/fetch-assets.sh`)
->   byte-identical extraction against the real snap.
->
-> **Not yet tested** (needs a display and/or a real account): real login &
-> actual cloud sync (FR-5/A-3), Google/Apple OAuth popups (FR-6), downloads
-> (FR-12), RPM build (§6.10), aarch64 (A-11).
->
-> Hard-won runtime notes (all validated in the container):
->
-> - **`sg://` must NOT be registered with `LocalScheme`/`LocalAccessAllowed`.**
->   A "local" scheme is treated like `file://`: every fetch/XHR to remote
->   http(s) fails instantly with `TypeError: Failed to fetch` — before CORS,
->   before any packet (nothing shows in the DevTools Network domain). This
->   silently killed all cloud traffic. Flags are exactly: `SecureScheme |
->   ServiceWorkersAllowed | CorsEnabled | FetchApiAllowed`.
-> - The vendor gRPC-web API sends a custom `deadline` header that the vendor's
->   own CORS preflight response does not allow (true for *any* origin — even
->   the official web client can't send it; the desktop client avoids CORS via
->   Electron's main process). `VendorApiInterceptor` strips that one header
->   for `*.singularity-app.com/.ru` before CORS evaluation — surgical fix, no
->   `--disable-web-security`.
-> - in environments where a **journald socket** is present, Qt logs do not
->   reach stderr — run with `QT_FORCE_STDERR_LOGGING=1` to see `shell.*` logs;
-> - the injected `preloadApi` stub is a *recursive universal proxy* — a plain
->   no-op-function proxy crashed the renderer boot (`this.ipc.send is not a
->   function`) before service worker registration. If you tune the stub
->   (P-1 in docs/phase0.md), keep the recursive shape.
+Tested on **ROSA Fresh 13.2, Qt 6.11.1**. Validated:
+
+- offline **cold start**: full UI renders from local assets, no network needed;
+- cloud API transport and **real login** work end-to-end;
+- **service worker** self-registers on `sg://renderer`, IndexedDB persists
+  across restarts (`AppDatabase`, `SingularityLogs3`);
+- **background updater**: Snap Store check, download, SHA3-384 verify, stage;
+- asset pipeline: `asar-extract` + `fetch-assets.sh` byte-identical extraction;
+- **Russian translation** (Qt Linguist) via `QTranslator`.
 
 ## How it works
 
@@ -65,7 +30,6 @@ answers `Access-Control-Allow-Origin: *`) exactly as in the official client.
   next start**. Disable with `--no-auto-update`.
 - All app state (cookies, IndexedDB, service workers) lives in a persistent
   `QWebEngineProfile` under `$XDG_DATA_HOME/singularity-shell/profile/`.
-
 ## Architecture: converting an Electron app to QtWebEngine
 
 This section is written as a reusable reference for anyone attempting a
@@ -184,11 +148,10 @@ into the bridge object plus adds `getPosition()`, `getBounds()`,
 #### 6. Service Worker + custom schemes
 
 The vendor's SW registers on `sg://renderer` and intercepts fetch events
-for the shell origin. For local file serving this is pure overhead (the
-files are always on disk), but **do not unregister it** — the SW also
-manages the app's offline sync queue. Our scheme handler serves files with
-correct MIME types; the SW falls through to the network for uncached
-resources, which our handler satisfies instantly.
+for the shell origin. Validated: after first launch the SW is active and
+IndexedDB contains `AppDatabase` + `SingularityLogs3`; both persist across
+restarts. For local file serving the SW intercept is pure overhead, but
+**do not unregister it** — the SW also manages the offline sync queue.
 
 #### 7. OAuth popups need in-app handling
 
@@ -213,8 +176,6 @@ When `LinguistTools` is in `find_package`, `qt_standard_project_setup()`
 auto-discovers `.ts` files in `translations/` and runs `lupdate`,
 overwriting hand-edited translations with empty templates. Fix: store
 `.ts` files in a non-standard directory (`i18n/`).
-Offline cold-start test: `nmcli networking off` (or `unshare -n
-./build/singularity-shell`), launch, work, quit, launch again.
 
 ## Layout
 
