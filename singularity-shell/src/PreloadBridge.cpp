@@ -18,11 +18,7 @@ void PreloadBridge::setVersions(QString appVer, QString assetVer)
 
 bool PreloadBridge::isMaximized() const
 {
-    if (auto* p = qobject_cast<QWebEnginePage*>(parent())) {
-        if (auto* view = qobject_cast<QWebEngineView*>(p->parent()))
-            return view->isMaximized();
-    }
-    return false;
+    return m_view ? m_view->isMaximized() : false;
 }
 
 void PreloadBridge::windowMinimize()   { emit minimizeRequested(); }
@@ -32,22 +28,22 @@ void PreloadBridge::windowClose()      { emit closeRequested(); }
 
 void PreloadBridge::zoomIn()
 {
-    if (auto* p = qobject_cast<QWebEnginePage*>(parent()))
+    if (auto* p = m_view ? m_view->page() : nullptr)
         p->setZoomFactor(qBound(0.25, p->zoomFactor() + 0.1, 5.0));
 }
 void PreloadBridge::zoomOut()
 {
-    if (auto* p = qobject_cast<QWebEnginePage*>(parent()))
+    if (auto* p = m_view ? m_view->page() : nullptr)
         p->setZoomFactor(qBound(0.25, p->zoomFactor() - 0.1, 5.0));
 }
 void PreloadBridge::zoomReset()
 {
-    if (auto* p = qobject_cast<QWebEnginePage*>(parent()))
+    if (auto* p = m_view ? m_view->page() : nullptr)
         p->setZoomFactor(1.0);
 }
 double PreloadBridge::zoomFactor() const
 {
-    if (auto* p = qobject_cast<QWebEnginePage*>(parent()))
+    if (auto* p = m_view ? m_view->page() : nullptr)
         return p->zoomFactor();
     return 1.0;
 }
@@ -57,17 +53,18 @@ void PreloadBridge::openExternal(const QString& url)
     if (!url.isEmpty())
         emit externalOpenRequested(QUrl(url));
 }
+
 void PreloadBridge::installOn(QWebEnginePage* page)
 {
-    // Connect this page's view to bridge signals. Each bridge instance is
-    // created per-page (main window gets one, each popup gets its own), so
-    // signals never cross-contaminate between windows.
-    if (auto* view = qobject_cast<QWebEngineView*>(page->parent())) {
-        connect(this, &PreloadBridge::minimizeRequested, view, &QWidget::showMinimized);
-        connect(this, &PreloadBridge::maximizeToggleRequested, view, [view] {
-            view->setWindowState(view->windowState() ^ Qt::WindowMaximized);
+    m_view = qobject_cast<QWebEngineView*>(page->parent());
+
+    if (m_view) {
+        connect(this, &PreloadBridge::minimizeRequested, m_view, &QWidget::showMinimized);
+        connect(this, &PreloadBridge::maximizeToggleRequested, m_view, [this] {
+            if (m_view)
+                m_view->setWindowState(m_view->windowState() ^ Qt::WindowMaximized);
         });
-        connect(this, &PreloadBridge::closeRequested, view, &QWidget::close);
+        connect(this, &PreloadBridge::closeRequested, m_view, &QWidget::close);
     }
     connect(this, &PreloadBridge::externalOpenRequested, this,
             [](const QUrl& u) { QDesktopServices::openUrl(u); });

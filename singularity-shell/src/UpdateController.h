@@ -37,10 +37,6 @@ public:
 
 private:
     bool m_bootstrap = false;
-
-    State state() const { return m_state; }
-    QString stagedVersion() const { return m_stagedVersion; }
-
 signals:
     void stateChanged(UpdateController::State state, const QString& detail);
     // 0..100 during Downloading; -1 = indeterminate.

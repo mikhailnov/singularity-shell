@@ -149,7 +149,8 @@ void AssetStore::pruneUserVersions(const QStringList& keepDirs) const
             sets << s;
     }
     std::sort(sets.begin(), sets.end(), [](const AssetSet& a, const AssetSet& b) {
-        return compareVersions(a.version, b.version) > 0;
+        if (int cmp = compareVersions(a.version, b.version)) return cmp > 0;
+        return a.revision > b.revision;
     });
 
     // Keep: everything in keepDirs (running + staged) + newest other one.

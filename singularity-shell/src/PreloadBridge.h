@@ -1,9 +1,11 @@
 #pragma once
 
 #include <QObject>
+#include <QPointer>
 #include <QString>
 
 class QWebEnginePage;
+class QWebEngineView;
 
 // PreloadBridge — replacement for the vendor's Electron `window.preloadApi`
 // bridge, per qt-tz.md FR-7 / §6.5.
@@ -63,4 +65,5 @@ signals:
 private:
     QString m_appVersion;
     QString m_assetVersion;
+    QPointer<QWebEngineView> m_view;  // set by installOn()
 };

@@ -57,11 +57,14 @@ bool NavigationPage::acceptNavigationRequest(const QUrl& url, NavigationType typ
     if (isVendorHost(url.host()))
         return true;
 
-    // OAuth providers used by the vendor (verified in app.bundle.js).
-    if (url.host().contains(QStringLiteral("accounts.google.com"))
-        || url.host().contains(QStringLiteral("appleid.apple.com"))
-        || url.host().contains(QStringLiteral("login.microsoftonline.com")))
+    if (url.host() == QStringLiteral("accounts.google.com")
+        || url.host().endsWith(QStringLiteral(".accounts.google.com"))
+        || url.host() == QStringLiteral("appleid.apple.com")
+        || url.host().endsWith(QStringLiteral(".appleid.apple.com"))
+        || url.host() == QStringLiteral("login.microsoftonline.com")
+        || url.host().endsWith(QStringLiteral(".login.microsoftonline.com"))) {
         return true;
+    }
 
     // Everything else: open in the system browser.
     emit externalUrlRequested(url);

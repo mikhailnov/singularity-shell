@@ -195,7 +195,7 @@ bool MainWindow::eventFilter(QObject* obj, QEvent* event)
         auto* ke = static_cast<QKeyEvent*>(event);
         const int key = ke->key();
         const auto mods = ke->modifiers();
-        if (mods == Qt::ControlModifier) {
+        if ((mods & Qt::ControlModifier) == Qt::ControlModifier) {
             if (key == Qt::Key_Equal || key == Qt::Key_Plus) {
                 setZoom(m_page->zoomFactor() + 0.1);
                 return true;

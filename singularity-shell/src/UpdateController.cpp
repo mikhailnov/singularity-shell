@@ -325,7 +325,7 @@ void UpdateController::onExtractFinished(int exitCode, int exitStatus)
     // Prune older user versions, keeping the staged one + one rollback (FR-9).
     // Never touch the currently running set (handled by AssetStore::pruneUserVersions
     // via keepDirs; the running root is passed by MainWindow through settings).
-    QSettings s;
+    QSettings s(settingsPath(), QSettings::IniFormat);
     const QString running = s.value(QStringLiteral("runtime/activeAssetDir")).toString();
     m_store->pruneUserVersions({m_destDir, running});
 }
