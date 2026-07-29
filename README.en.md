@@ -209,6 +209,14 @@ auto-discovers `.ts` files in `translations/` and runs `lupdate`,
 overwriting hand-edited translations with empty templates. Fix: store
 `.ts` files in a non-standard directory (`i18n/`).
 
+#### 10. Hide vendor's in-app window controls
+
+The vendor's Electron window is frameless and draws its own minimize /
+maximize / close buttons in the web content (class `.win-top-panel`).
+Since Qt provides native window decorations, these in-app controls are
+redundant and waste vertical space. A single CSS rule injected at page
+creation hides them: `.win-top-panel { display: none !important; }`.
+
 ## Features
 
 ### Theme-aware background
