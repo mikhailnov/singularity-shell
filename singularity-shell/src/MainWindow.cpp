@@ -6,6 +6,7 @@
 #include <QAction>
 #include <QApplication>
 #include <QCloseEvent>
+#include <QColor>
 #include <QDesktopServices>
 #include <QJsonDocument>
 #include <QLabel>
@@ -30,6 +31,7 @@ MainWindow::MainWindow(QWebEngineProfile* profile, PreloadBridge* bridge,
 
     m_view = new QWebEngineView(this);
     m_page = new NavigationPage(profile, /*permissivePopups=*/false, bridge, m_view);
+    m_page->setBackgroundColor(QColor(0x1a, 0x1a, 0x2e)); // dark bg, avoid white flash
     m_view->setPage(m_page);
     setCentralWidget(m_view);
 

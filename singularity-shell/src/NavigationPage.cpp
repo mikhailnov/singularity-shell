@@ -2,6 +2,7 @@
 #include "PreloadBridge.h"
 
 #include <QAction>
+#include <QColor>
 #include <QDesktopServices>
 #include <QKeySequence>
 #include <QLoggingCategory>
@@ -75,6 +76,7 @@ QWebEnginePage* NavigationPage::createWindow(WebWindowType type)
     auto* view = new QWebEngineView(win);
     auto* page = new NavigationPage(profile(), /*permissivePopups=*/false,
                                     /*bridge=*/nullptr, view);
+    page->setBackgroundColor(QColor(0x1a, 0x1a, 0x2e));
     view->setPage(page);
     win->setCentralWidget(view);
 
@@ -119,6 +121,7 @@ QWebEnginePage* NavigationPage::createWindow(WebWindowType type)
 void NavigationPage::openDiagnostics(QWebEngineProfile* profile, const QString& url)
 {
     auto* page = new QWebEnginePage(profile);
+    page->setBackgroundColor(QColor(0x1a, 0x1a, 0x2e));
     auto* view = new QWebEngineView;
     view->setAttribute(Qt::WA_DeleteOnClose);
     view->setPage(page);
