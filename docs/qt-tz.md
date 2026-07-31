@@ -334,7 +334,7 @@ Subcommands:
 
 - `packaging/singularity-shell.spec` builds the C++ app and **bundles the baseline asset set**: the `%prep`/`%build` stage runs `scripts/fetch-assets.sh latest %{buildroot}/usr/share/singularity-shell` (or consumes a pre-fetched asset tarball from the build system — the spec must support both, since build hosts may be offline).
 - The package owns `/usr/share/singularity-shell/**` (root:root, `0644`/`0755`, no `%config` — replaced wholesale on package upgrade). Package upgrade replaces the baseline; user-downloaded versions in `$HOME` are untouched and continue to win per FR-9a only if newer (see the rollback guard).
-- Requires: `qt6-qtwebengine` (distro package name per target distro — document in README), `squashfs-tools` (for runtime extraction), `curl`, `jq` (for the helper script), plus the `.desktop` file and icon (icon extracted from the snap assets: `resources/icons/icon.png` / `meta/gui/icon.png`).
+- Requires: `qt6-qtwebengine` (distro package name per target distro — document in README), `qt6-qttranslations` (UI localization: `qt_<locale>.qm` for Qt's own dialogs **and** `qtwebengine_<locale>.qm` for the Chromium right-click context menu — Undo/Redo/Cut/Copy/Paste/Paste-and-match-style/Select-all — and the JS alert/confirm/prompt dialogs; note Chromium's own UI (error pages, find bar) comes from the `.pak` files in `qtwebengine_locales/`, not this catalog; `qt6-qtwebengine` does **not** pull `qt6-qttranslations` in), `squashfs-tools` (for runtime extraction), `curl`, `jq` (for the helper script), plus the `.desktop` file and icon (icon extracted from the snap assets: `resources/icons/icon.png` / `meta/gui/icon.png`).
 - The RPM never runs the GUI app in `%post`; no network access at install time.
 
 ### 6.9 Diagnostics

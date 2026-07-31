@@ -96,6 +96,17 @@ int main(int argc, char* argv[])
     if (qtTranslator.load(QLocale(), QStringLiteral("qt"), QStringLiteral("_"),
                           QLibraryInfo::path(QLibraryInfo::TranslationsPath)))
         app.installTranslator(&qtTranslator);
+    // QtWebEngine's Qt-side strings — the Chromium right-click context menu
+    // (Undo/Redo/Cut/Copy/Paste/Paste-and-match-style/Select-all) and the JS
+    // alert/confirm/prompt dialogs — live in a SEPARATE catalog ("qtwebengine",
+    // not "qt"). Without it the context menu stays English. (Chromium's own
+    // UI — network error pages, the find bar — is driven by the .pak locale
+    // files in qtwebengine_locales/, set from the app locale, not this catalog.)
+    QTranslator webEngineTranslator;
+    if (webEngineTranslator.load(QLocale(), QStringLiteral("qtwebengine"),
+                                 QStringLiteral("_"),
+                                 QLibraryInfo::path(QLibraryInfo::TranslationsPath)))
+        app.installTranslator(&webEngineTranslator);
 
     QTranslator appTranslator;
     const QStringList tsPaths = {
