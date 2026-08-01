@@ -84,6 +84,15 @@ void PreloadBridge::installOn(QWebEnginePage* page)
 ;(function () {
     'use strict';
 
+    // --- Electron process stub: makes the vendor code detect us as desktop ---
+    // The vendor's getPlatform() (module 207011 in app.bundle.js) checks:
+    //   1. typeof process !== "undefined" && process.platform → switch to OS
+    //   2. navigator.userAgent.includes("Electron")             → desktop flag
+    //   3. Otherwise → Platform.Web (triggers browser-only alerts)
+    // We provide process.platform="linux" so step 1 resolves to Platform.Linux
+    // without needing "Electron" in QtWebEngine's user agent.
+    window.process = { platform: 'linux', argv: [] };
+
     // --- CSS: hide window-control buttons (Qt provides native decorations) ---
     var style = document.createElement('style');
     style.textContent = '.win-top-panel { display: none !important; }';
