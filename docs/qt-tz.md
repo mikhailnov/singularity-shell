@@ -341,6 +341,7 @@ Subcommands:
 
 - `--diagnose`: logging-only interceptor (FR-11) + `QTWEBENGINE_CHROMIUM_FLAGS="--enable-logging=stderr --v=0"` passthrough option `--chromium-flags="<flags>"`.
 - Document `QTWEBENGINE_REMOTE_DEBUGGING=<port>` for DevTools (inspect service workers, IndexedDB, network) in README.
+- In-app DevTools: the **Diagnostics → Developer tools** action (shortcut **F12**) opens Chromium DevTools bound to the current page via `QWebEnginePage::setDevToolsPage`, available in both the main window and popups. This covers everyday inspection (console, network, service workers, IndexedDB, application storage) without the env var; `QTWEBENGINE_REMOTE_DEBUGGING` remains useful only to drive an *external* browser as the DevTools frontend.
 
 ## 7. Phase 0 — discovery tasks (do these first; feed results into §6.5/§6.6)
 

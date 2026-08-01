@@ -25,6 +25,8 @@ public:
 
     // Opens a bare diagnostic window on the given profile.
     static void openDiagnostics(QWebEngineProfile* profile, const QString& url);
+    // Opens Chromium DevTools inspecting `inspected` in a new window.
+    static void openDevTools(QWebEnginePage* inspected);
 
     static bool isVendorHost(const QString& host);
 

@@ -88,6 +88,10 @@ void MainWindow::buildMenus()
     diagMenu->addAction(tr("Force reload"), this, [this] {
         m_page->triggerAction(QWebEnginePage::ReloadAndBypassCache);
     });
+    QAction* devTools = diagMenu->addAction(tr("&Developer tools"), this, [this] {
+        NavigationPage::openDevTools(m_page);
+    });
+    devTools->setShortcut(QKeySequence(QStringLiteral("F12")));
     diagMenu->addSeparator();
     diagMenu->addAction(QStringLiteral("chrome://gpu"), this, [this] { NavigationPage::openDiagnostics(m_profile, QStringLiteral("chrome://gpu")); });
     diagMenu->addAction(QStringLiteral("chrome://indexeddb-internals"), this, [this] { NavigationPage::openDiagnostics(m_profile, QStringLiteral("chrome://indexeddb-internals")); });

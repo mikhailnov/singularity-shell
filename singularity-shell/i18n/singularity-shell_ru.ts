@@ -48,6 +48,10 @@
         <translation>&amp;Диагностика</translation>
     </message>
     <message>
+        <source>&amp;Developer tools</source>
+        <translation>&amp;Инструменты разработчика</translation>
+    </message>
+    <message>
         <source>Force reload</source>
         <translation>Перезагрузить</translation>
     </message>
@@ -113,6 +117,10 @@
     <message>
         <source>&amp;Diagnostics</source>
         <translation>&amp;Диагностика</translation>
+    </message>
+    <message>
+        <source>&amp;Developer tools</source>
+        <translation>&amp;Инструменты разработчика</translation>
     </message>
     <message>
         <source>Force reload</source>

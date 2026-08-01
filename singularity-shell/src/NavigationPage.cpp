@@ -110,6 +110,10 @@ QWebEnginePage* NavigationPage::createWindow(WebWindowType type)
     diagMenu->addAction(tr("Force reload"), win, [page] {
         page->triggerAction(QWebEnginePage::ReloadAndBypassCache);
     });
+    QAction* devTools = diagMenu->addAction(tr("&Developer tools"), win, [page] {
+        openDevTools(page);
+    });
+    devTools->setShortcut(QKeySequence(QStringLiteral("F12")));
     diagMenu->addSeparator();
     auto* p = profile();
     diagMenu->addAction(QStringLiteral("chrome://gpu"), win, [p] { openDiagnostics(p, QStringLiteral("chrome://gpu")); });
@@ -137,6 +141,25 @@ void NavigationPage::openDiagnostics(QWebEngineProfile* profile, const QString& 
     view->setWindowTitle(QStringLiteral("Diagnostics — ") + url);
     view->load(QUrl(url));
     view->show();
+}
+
+void NavigationPage::openDevTools(QWebEnginePage* inspected)
+{
+    if (!inspected)
+        return;
+    // DevTools ships its own dark/light theme — do not force a background.
+    auto* win = new QMainWindow;
+    win->setAttribute(Qt::WA_DeleteOnClose);
+    win->resize(1100, 800);
+    win->setWindowTitle(QStringLiteral("Developer Tools — Singularity shell"));
+
+    auto* view = new QWebEngineView(win);
+    auto* devTools = new QWebEnginePage(inspected->profile(), view);
+    view->setPage(devTools);
+    win->setCentralWidget(view);
+
+    inspected->setDevToolsPage(devTools);
+    win->show();
 }
 
 
