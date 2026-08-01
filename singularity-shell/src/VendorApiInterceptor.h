@@ -6,6 +6,8 @@
 #include <QWebEngineUrlRequestInfo>
 #include <QUrl>
 
+#include "NetLog.h"
+
 // VendorApiInterceptor — removes the `deadline` gRPC metadata header from
 // requests to the vendor API hosts (proxyN.singularity-app.com/.ru).
 //
@@ -31,6 +33,11 @@ public:
 
     void interceptRequest(QWebEngineUrlRequestInfo& info) override
     {
+        if (NetLog::enabled())
+            fprintf(stderr, "[net] %-13s %s %s\n",
+                    NetLog::resourceTypeName(int(info.resourceType())),
+                    info.requestMethod().constData(),
+                    qUtf8Printable(info.requestUrl().toString()));
         const QString host = info.requestUrl().host();
         static const QLatin1String suffixes[] = {
             QLatin1String(".singularity-app.com"),

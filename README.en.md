@@ -62,6 +62,45 @@ answers `Access-Control-Allow-Origin: *`) exactly as in the official client.
 
 - **Print (Ctrl+P)**: printing the daily plan does not work (see `docs/printing.md`).
 
+## Diagnostics
+
+### Developer tools
+
+**Diagnostics → Developer tools** (or the **F12** key) opens Chromium DevTools
+for the current page: Console, Network, Application (service workers,
+IndexedDB, cookies), Sources. Works in both the main window and popups. For an
+external browser: `QTWEBENGINE_REMOTE_DEBUGGING=9222 singularity-shell`, then
+open `http://localhost:9222`.
+
+### Network request logging
+
+The environment variable **`SINGULARITY_SHELL_LOG_REQUESTS=1`** enables verbose
+logging of every network request to stderr — on top of the working CORS fix
+(unlike `--diagnose`):
+
+```bash
+SINGULARITY_SHELL_LOG_REQUESTS=1 singularity-shell 2>&1 | grep -E '\[net\]|\[sg-proxy\]'
+```
+
+- `[net] <type> <method> <URL>` — every intercepted request (no HTTP status: the
+  interceptor runs before the response is received);
+- `[sg-proxy] <method> <URL>` and `[sg-proxy] HTTP <status> (<ok|error>) <URL>` —
+  proxied requests (e.g. subscribing to an iCal calendar) **with status**;
+- `[sg-proxy] refused non-vendor host…` — proxy-relay refusal (SSRF protection),
+  logged unconditionally.
+
+These lines make it easy to see, for example, that an iCal request goes through
+the `sg://` relay while other requests go direct.
+
+### Other
+
+- `--diagnose` — a separate logging-only interceptor (observation only; disables
+  the `deadline` CORS fix, so cloud calls may fail — prefer the env var above for
+  network debugging).
+- `--no-auto-update` — disable the background updater.
+- `--probe` — dump page state (service workers, IndexedDB) 20 s after start,
+  then quit (debug aid).
+
 ## Architecture: converting an Electron app to QtWebEngine
 
 This section is written as a reusable reference for anyone attempting a

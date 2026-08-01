@@ -288,6 +288,46 @@ login form advances to the password step. Do **not** use
 `--disable-web-security` as an alternative — it weakens the whole profile for
 no benefit once this interceptor exists.
 
+### 6.4b iCal / no-CORS endpoint relay (validated)
+
+Some vendor features need a cross-origin fetch the renderer cannot make
+directly. The vendor's `PROXY_NO_CORS_URL` endpoint
+(`https://singularity-app.com/ical/?url=<feed>`, used by the iCal calendar
+integration) returns no `Access-Control-Allow-Origin` for the `sg://renderer`
+origin — it whitelists only the web client's `https://web.singularity-app.com`.
+The official **desktop** client avoids this as in §6.4a: such fetches run from
+the Electron main process (Node, no CORS), which our renderer lacks. The request
+is also CORS-**preflighted** (non-simple headers), which matters below.
+
+Why a network-layer redirect does NOT work: CORS forbids redirecting a preflight
+("Redirect is not allowed for a preflight request"), and a request interceptor
+cannot inject response headers. So the request can only succeed if it is
+**same-origin** in the first place.
+
+Fix (service-worker rewrite): the request originates in the cloud Web Worker and
+is intercepted by the vendor service worker, which is our own asset
+(`sg://renderer/build/sw.js`). `SgSchemeHandler` **prepends a small patch** to
+the served `sw.js` that wraps `self.fetch` and rewrites any
+`singularity-app.com(/.ru)/ical/…` URL to the same-origin relay
+`sg://renderer/__proxy__?u=<percent-encoded original URL>`. The SW then issues a
+preflight-free same-origin fetch; `SgSchemeHandler::proxyRequest` fetches the
+original URL **natively** via `QNetworkAccessManager` (Qt's own stack — does not
+re-enter Chromium's interceptor, so no loop) and relays the body. The patch also
+calls `skipWaiting()`+`clients.claim()` so the updated SW activates without a
+manual close-all-clients dance (expect the fix to take effect from the next
+launch after the patched `sw.js` is first served). A safe subset of request
+headers (auth, content negotiation — never `Host`/`Origin`/`Referer`/CORS) is
+forwarded; the vendor `Content-Type` is passed through.
+
+**Security boundary:** the relay is NOT an open proxy — `proxyRequest` rejects
+any target whose host is not `singularity-app.com`/`.ru` (or a subdomain), so
+forwarded `Cookie`/`Authorization` can only reach their legitimate owner, and
+arbitrary / `localhost` / internal-network URLs (SSRF) are refused. The SW patch
+only rewrites vendor `/ical/` URLs, never arbitrary ones.
+
+`requestStarted()` runs on the main/UI thread (empirically confirmed), so the
+`QNetworkAccessManager` is created and used there.
+
 ### 6.5 `preloadApi` stub and bridge (*Phase 0* dependency)
 
 *Phase 0 task P-1:* extract `build/main/preload.js` from the snap (commands in §11) and enumerate the exact `window.preloadApi` surface (method names, arguments, return-value expectations — sync value vs `Promise`). Also grep `build/js/app.bundle.js` for `preloadApi.` call sites to rank which methods are actually invoked during startup and normal use.
@@ -342,6 +382,7 @@ Subcommands:
 - `--diagnose`: logging-only interceptor (FR-11) + `QTWEBENGINE_CHROMIUM_FLAGS="--enable-logging=stderr --v=0"` passthrough option `--chromium-flags="<flags>"`.
 - Document `QTWEBENGINE_REMOTE_DEBUGGING=<port>` for DevTools (inspect service workers, IndexedDB, network) in README.
 - In-app DevTools: the **Diagnostics → Developer tools** action (shortcut **F12**) opens Chromium DevTools bound to the current page via `QWebEnginePage::setDevToolsPage`, available in both the main window and popups. This covers everyday inspection (console, network, service workers, IndexedDB, application storage) without the env var; `QTWEBENGINE_REMOTE_DEBUGGING` remains useful only to drive an *external* browser as the DevTools frontend.
+- `SINGULARITY_SHELL_LOG_REQUESTS` (env, any non-empty value): verbose request logging to stderr, kept **on top of** the `deadline` fix (unlike `--diagnose`, which trades it away). `VendorApiInterceptor` logs every intercepted request as `[net] <ResourceType> <method> <url>` (it sees requests pre-network, so no HTTP status); `SgSchemeHandler::proxyRequest` additionally logs the iCal relay with status — `[sg-proxy] <method> <url>` on start and `[sg-proxy] HTTP <status> (<ok|error>) <url>` on completion (refusals are logged unconditionally). Use this to see, e.g., that iCal fetches go through the `sg://` relay while everything else does not.
 
 ## 7. Phase 0 — discovery tasks (do these first; feed results into §6.5/§6.6)
 

@@ -47,6 +47,7 @@ qt_add_executable(singularity-shell
     src/UpdateController.cpp
     src/DiagnosticsInterceptor.h
     src/VendorApiInterceptor.h
+    src/NetLog.h
     resources/shell.qrc
 )
 
