@@ -13,6 +13,9 @@
 #include <QColor>
 #include <QDesktopServices>
 #include <QJsonDocument>
+#include <QDir>
+#include <QFile>
+
 #include <QKeyEvent>
 #include <QLabel>
 #include <QProcess>
@@ -103,6 +106,12 @@ void MainWindow::buildMenus()
         suspendWebEngine();
     });
     hideAction->setShortcut(QKeySequence(QStringLiteral("Ctrl+W")));
+    m_autostartAction = appMenu->addAction(QString(), this, [this] {
+        setAutostart(!isAutostartEnabled());
+    });
+    connect(appMenu, &QMenu::aboutToShow, this, [this] {
+        updateAutostartAction();
+    });
     m_quitAction = appMenu->addAction(tr("&Quit"), this, [this] {
         if (m_tray)
             m_tray->hide();
@@ -307,6 +316,13 @@ void MainWindow::setupTray()
         showAction->setText(isVisible() ? tr("&Hide") : tr("&Show"));
     });
     menu->addAction(tr("&About"), this, &MainWindow::showAbout);
+    QAction* trayAutostart = menu->addAction(QString(), this, [this] {
+        setAutostart(!isAutostartEnabled());
+    });
+    connect(menu, &QMenu::aboutToShow, this, [this, trayAutostart] {
+        trayAutostart->setText(isAutostartEnabled()
+            ? tr("Disable autostart") : tr("Enable autostart"));
+    });
     menu->addSeparator();
     menu->addAction(tr("&Quit"), qApp, &QApplication::quit);
     m_tray->setContextMenu(menu);
@@ -356,4 +372,55 @@ void MainWindow::resumeWebEngine()
 #if QT_VERSION >= QT_VERSION_CHECK(6, 4, 0)
     m_page->setLifecycleState(QWebEnginePage::LifecycleState::Active);
 #endif
+}
+
+// --- Autostart (XDG autostart spec) ------------------------------------------
+
+bool MainWindow::isAutostartEnabled() const
+{
+    const QString userFile = QStandardPaths::writableLocation(
+        QStandardPaths::ConfigLocation) + QStringLiteral("/autostart/singularity-shell.desktop");
+    const QString systemFile = QStringLiteral(SINGULARITY_SHELL_SYSTEM_AUTOSTART);
+
+    if (QFile::exists(userFile)) {
+        QFile f(userFile);
+        if (f.open(QIODevice::ReadOnly | QIODevice::Text))
+            return !f.readAll().contains("Hidden=true");
+        return true;  // can't read — assume enabled
+    }
+    return QFile::exists(systemFile);
+}
+
+void MainWindow::setAutostart(bool enable)
+{
+    const QString autostartDir = QStandardPaths::writableLocation(
+        QStandardPaths::ConfigLocation) + QStringLiteral("/autostart");
+    const QString userFile = autostartDir + QStringLiteral("/singularity-shell.desktop");
+    const QString systemFile = QStringLiteral(SINGULARITY_SHELL_SYSTEM_AUTOSTART);
+
+    QDir().mkpath(autostartDir);
+
+    if (enable) {
+        if (QFile::exists(systemFile)) {
+            QFile::remove(userFile);  // let system file take over
+        } else {
+            QFile::remove(userFile);
+            QFile::copy(QStringLiteral(":/autostart.desktop"), userFile);
+        }
+    } else {
+        QFile::remove(userFile);
+        if (QFile::exists(systemFile)) {
+            QFile f(userFile);
+            if (f.open(QIODevice::WriteOnly | QIODevice::Text | QIODevice::Truncate))
+                f.write("[Desktop Entry]\nHidden=true\n");
+        }
+    }
+}
+
+void MainWindow::updateAutostartAction()
+{
+    if (m_autostartAction) {
+        m_autostartAction->setText(isAutostartEnabled()
+            ? tr("Disable autostart") : tr("Enable autostart"));
+    }
 }

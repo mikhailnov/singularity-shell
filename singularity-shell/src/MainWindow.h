@@ -42,6 +42,9 @@ private:
     void setupTray();
     void suspendWebEngine();
     void resumeWebEngine();
+    bool isAutostartEnabled() const;
+    void setAutostart(bool enable);
+    void updateAutostartAction();
 
     QWebEngineView* m_view = nullptr;
     NavigationPage* m_page = nullptr;
@@ -50,6 +53,7 @@ private:
     QLabel* m_updateStatus = nullptr;
     QSystemTrayIcon* m_tray = nullptr;
     QAction* m_quitAction = nullptr;
+    QAction* m_autostartAction = nullptr;
     bool m_startHidden = false;
     QString m_assetVersion;
 };

@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Singularity
+Comment=Unofficial SingularityApp — background launch
+Comment[ru]=Неофициальное приложение Singularity — фоновый запуск
+Exec=singularity-shell --start-hidden
+Icon=singularity-shell
+Categories=Office;Utility;
+Terminal=false
+X-GNOME-Autostart-enabled=true

@@ -24,6 +24,11 @@ When hidden to tray, JavaScript execution is frozen — **~0% CPU** load, instan
 
 ![tray](docs/img-ru/tray.png)
 
+You can enable **autostart** — the app will launch frozen in the tray, ready
+to use instantly with a click on the tray icon, without consuming CPU.
+The official client [lacks autostart](https://singularity-app.ru/backlog/118494/) on all
+operating systems — here it works on Linux.
+
 ## Installation
 
 ### ROSA Linux, MOS/MosTech.OS
@@ -281,6 +286,18 @@ instant restore.
 
 On GNOME without a tray extension the app falls back to normal quit
 behavior.
+
+#### 12. XDG autostart integration
+
+The **Enable/Disable autostart** toggle in the File menu and tray menu
+manages a desktop file at `~/.config/autostart/singularity-shell.desktop`
+per the XDG autostart spec.  When enabled and no system-wide file exists
+(`/etc/xdg/autostart/singularity-shell.desktop`), the app copies its
+built-in desktop file (with `Exec=singularity-shell --start-hidden`) into
+the user's autostart directory.  When disabled, the user file is removed,
+or if a system file exists, overridden with `Hidden=true`.
+
+The toggle reads the actual file state — no separate config key needed.
 
 ## Features
 

@@ -54,6 +54,7 @@ qt_add_executable(singularity-shell
 target_compile_definitions(singularity-shell PRIVATE
     SINGULARITY_SHELL_DATADIR="${SINGULARITY_SHELL_DATADIR}"
     SINGULARITY_SHELL_SYSTEM_ASSETS="${SINGULARITY_SHELL_DATADIR}/assets"
+    SINGULARITY_SHELL_SYSTEM_AUTOSTART="${CMAKE_INSTALL_FULL_SYSCONFDIR}/xdg/autostart/singularity-shell.desktop"
     APP_VERSION="${PROJECT_VERSION}"
 )
 

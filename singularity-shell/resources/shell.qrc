@@ -1,6 +1,7 @@
 <RCC>
     <qresource prefix="/">
         <file alias="tray-icon.svg">../packaging/singularity-shell.svg</file>
+        <file alias="autostart.desktop">singularity-shell-autostart.desktop</file>
     </qresource>
     <qresource prefix="/html">
         <file alias="bootstrap.html">bootstrap.html</file>
