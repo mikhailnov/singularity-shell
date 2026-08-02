@@ -33,7 +33,7 @@ operating systems — here it works on Linux.
 
 ### ROSA Linux, MOS/MosTech.OS
 
-On ROSA 13+: `sudo dnf install singularity-shell`
+On [ROSA](https://mirror.rosa.ru/rosa/rosa13/iso/) 13+: `sudo dnf install singularity-shell`
 
 RPM packaging sources: https://abf.io/import/singularity-shell
 

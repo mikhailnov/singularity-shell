@@ -32,7 +32,7 @@
 ### ROSA Linux, МОС, МосТех.ОС
 
 На Росе 13+: `sudo dnf install singularity-shell`  
-(Роса Фреш, Роса Хром)
+([Роса Фреш](https://rosa.ru/rosa-fresh-13/), [Роса Хром](https://rosa.ru/chrome/))
 
 Исходники RPM: https://abf.io/import/singularity-shell
 
