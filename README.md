@@ -35,7 +35,7 @@
 
 ### Сборка из исходников
 
-Установите deve-пакеты Qt и QtWebEngine.
+Установите devel-пакеты Qt и QtWebEngine.
 
 ```bash
 mkdir build
