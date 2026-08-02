@@ -260,11 +260,27 @@ Since Qt provides native window decorations, these in-app controls are
 redundant and waste vertical space. A single CSS rule injected at page
 creation hides them: `.win-top-panel { display: none !important; }`.
 
+#### 11. System tray with JavaScript freeze
+
+A full Chromium renderer running the vendor's JavaScript consumes CPU
+even when idle (timers, service workers, sync polling). Cold start is
+also slow — several seconds to load the SPA and re-register the SW.
+
+Solution: a system tray with `QWebEnginePage::LifecycleState::Frozen`.
+When the window is closed or hidden to tray (Ctrl+W), the page is
+frozen — all JS execution stops, CPU drops to ~0%, memory is retained.
+Restoring the window calls `LifecycleState::Active` — the page resumes
+instantly, no reload needed.
+
+On GNOME without a tray extension the app falls back to normal quit
+behavior.
+
 ## Features
 
 ### Theme-aware background
 
 On startup the page background matches the system color scheme:
+
 dark `#1a1a2e` or light `#f0f0f5`. Changes live when the user switches
 the system theme (`QStyleHints::colorSchemeChanged`). Eliminates the
 jarring white flash before app content loads.
@@ -279,6 +295,13 @@ percentage and offers Zoom In / Zoom Out / Reset actions.
 Keyboard shortcuts are handled via `eventFilter` on the
 `QWebEngineView` — Chromium's internal key handling intercepts
 `QShortcut` and `QAction` shortcuts at a lower Qt level.
+
+### System tray with JavaScript freeze
+
+Closing or hiding the window (Ctrl+W) minimizes to the system tray and
+freezes JavaScript — CPU drops to near zero. Clicking the tray icon
+or choosing **Show** restores the window instantly, with the page
+exactly as it was left. No reload, no delay.
 
 ## Code layout
 
