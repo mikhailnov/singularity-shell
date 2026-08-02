@@ -16,6 +16,8 @@
 #include <QKeyEvent>
 #include <QLabel>
 #include <QProcess>
+#include <QTimer>
+
 
 #include <QMenuBar>
 #include <QMessageBox>
@@ -28,11 +30,13 @@
 #include <QWebEngineProfile>
 #include <QWebEngineView>
 MainWindow::MainWindow(QWebEngineProfile* profile, PreloadBridge* bridge,
-                       const QString& assetVersion, QWidget* parent)
+                       const QString& assetVersion, bool startHidden,
+                       QWidget* parent)
     : QMainWindow(parent)
     , m_profile(profile)
     , m_bridge(bridge)
     , m_assetVersion(assetVersion)
+    , m_startHidden(startHidden)
 {
     setWindowTitle(tr("Singularity"));
     resize(1280, 800);
@@ -46,6 +50,7 @@ MainWindow::MainWindow(QWebEngineProfile* profile, PreloadBridge* bridge,
 
     buildMenus();
     setupTray();
+
 
     // Restore geometry.
     QSettings s(settingsPath(), QSettings::IniFormat);
@@ -167,6 +172,14 @@ void MainWindow::loadApp()
         if (z != 1.0)
             m_page->setZoomFactor(qBound(0.25, z, 5.0));
     }, Qt::SingleShotConnection);
+    // If starting hidden, freeze after 12 s — enough for the SPA to fully
+    // render (React mount, IndexedDB open, SW register).
+    if (m_startHidden) {
+        QTimer::singleShot(12'000, this, [this] {
+            if (!isVisible())
+                suspendWebEngine();
+        });
+    }
 }
 
 

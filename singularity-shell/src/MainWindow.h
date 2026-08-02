@@ -19,7 +19,8 @@ class MainWindow : public QMainWindow
     Q_OBJECT
 public:
     MainWindow(QWebEngineProfile* profile, PreloadBridge* bridge,
-               const QString& assetVersion, QWidget* parent = nullptr);
+               const QString& assetVersion, bool startHidden = false,
+               QWidget* parent = nullptr);
 
     QWebEngineView* view() const { return m_view; }
     NavigationPage* page() const { return m_page; }
@@ -48,6 +49,7 @@ private:
     PreloadBridge* m_bridge = nullptr;
     QLabel* m_updateStatus = nullptr;
     QSystemTrayIcon* m_tray = nullptr;
-    QAction* m_quitAction = nullptr;  // File > Quit — behavior depends on tray
+    QAction* m_quitAction = nullptr;
+    bool m_startHidden = false;
     QString m_assetVersion;
 };

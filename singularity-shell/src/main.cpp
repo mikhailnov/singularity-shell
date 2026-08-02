@@ -151,12 +151,16 @@ int main(int argc, char* argv[])
     const QCommandLineOption optClearProfile(
         QStringLiteral("clear-profile"),
         QStringLiteral("Remove all local data and restart with a fresh profile."));
+    const QCommandLineOption optStartHidden(
+        QStringLiteral("start-hidden"),
+        QStringLiteral("Start minimized to tray (page loads in background)."));
     parser.addOption(optDiagnose);
     parser.addOption(optNoUpdate);
     parser.addOption(optChromium);
     parser.addOption(optNoStub);
     parser.addOption(optProbe);
     parser.addOption(optClearProfile);
+    parser.addOption(optStartHidden);
     parser.process(app);
     // --- Data locations (§6.2) ------------------------------------------------
     const QString dataDir =
@@ -239,13 +243,23 @@ int main(int argc, char* argv[])
     bridge->setVersions(QStringLiteral(APP_VERSION),
                         bootstrap ? QString() : active.version);
 
+
+    const bool startHidden = parser.isSet(optStartHidden);
     MainWindow window(profile, parser.isSet(optNoStub) ? nullptr : bridge,
-                      bootstrap ? QString() : active.version);
+                      bootstrap ? QString() : active.version, startHidden);
     if (bootstrap)
         window.loadBootstrap();
     else
         window.loadApp();
-    window.show();
+    if (startHidden) {
+        // Show briefly so the WebEngine view gets real screen geometry
+        // (otherwise it renders at 0x0 and the SPA uses mobile layout).
+        // Hide on the next event loop iteration — no visible flash.
+        window.show();
+        QTimer::singleShot(0, &window, &QWidget::hide);
+    } else {
+        window.show();
+    }
 
     // --- Background updater (FR-9; silent, staged) ------------------------------
     UpdateController updater(&store, dataDir, helperScriptPath(), &app);

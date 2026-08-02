@@ -272,6 +272,13 @@ frozen — all JS execution stops, CPU drops to ~0%, memory is retained.
 Restoring the window calls `LifecycleState::Active` — the page resumes
 instantly, no reload needed.
 
+The `--start-hidden` CLI flag starts the app minimized to tray — the page
+loads in background.  The window is shown and immediately hidden on the next
+event-loop tick (`QTimer::singleShot(0, hide)`) — this gives the WebEngine
+view real screen geometry (so the SPA renders the desktop layout, not mobile)
+without any visible flash.  After 12 seconds the page is frozen, ready for
+instant restore.
+
 On GNOME without a tray extension the app falls back to normal quit
 behavior.
 
