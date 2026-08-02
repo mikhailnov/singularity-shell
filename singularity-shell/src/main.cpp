@@ -10,6 +10,7 @@
 #include <QFileDialog>
 #include <QFileInfo>
 #include <QLibraryInfo>
+#include <QLockFile>
 #include <QLocale>
 #include <QLoggingCategory>
 #include <QSettings>
@@ -147,17 +148,32 @@ int main(int argc, char* argv[])
         QStringLiteral("probe"),
         QStringLiteral("Dump page runtime diagnostics (service workers, IndexedDB) "
                        "to stdout 20 s after start, then quit. Debug aid."));
+    const QCommandLineOption optClearProfile(
+        QStringLiteral("clear-profile"),
+        QStringLiteral("Remove all local data and restart with a fresh profile."));
     parser.addOption(optDiagnose);
     parser.addOption(optNoUpdate);
     parser.addOption(optChromium);
     parser.addOption(optNoStub);
     parser.addOption(optProbe);
+    parser.addOption(optClearProfile);
     parser.process(app);
-
     // --- Data locations (§6.2) ------------------------------------------------
     const QString dataDir =
         QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+
+    if (parser.isSet(optClearProfile)) {
+        qCInfo(lcMain) << "--clear-profile: removing" << dataDir;
+        QDir(dataDir).removeRecursively();
+    }
     QDir().mkpath(dataDir);
+
+    // --- Single-instance lock ------------------------------------------------
+    QLockFile lock(dataDir + QStringLiteral("/.lock"));
+    if (!lock.tryLock()) {
+        qCInfo(lcMain) << "another instance is already running (lock:" << lock.fileName() << ")";
+        return 0;
+    }
 
     AssetStore store(dataDir + QStringLiteral("/assets"),
                      QStringLiteral(SINGULARITY_SHELL_SYSTEM_ASSETS));

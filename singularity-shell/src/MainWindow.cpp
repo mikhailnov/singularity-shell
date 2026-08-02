@@ -15,6 +15,8 @@
 #include <QJsonDocument>
 #include <QKeyEvent>
 #include <QLabel>
+#include <QProcess>
+
 #include <QMenuBar>
 #include <QMessageBox>
 #include <QSettings>
@@ -117,7 +119,25 @@ void MainWindow::buildMenus()
     diagMenu->addAction(QStringLiteral("chrome://net-internals"), this, [this] { NavigationPage::openDiagnostics(m_profile, QStringLiteral("chrome://net-internals")); });
     diagMenu->addAction(QStringLiteral("chrome://serviceworker-internals"), this, [this] { NavigationPage::openDiagnostics(m_profile, QStringLiteral("chrome://serviceworker-internals")); });
     diagMenu->addAction(QStringLiteral("chrome://tracing"), this, [this] { NavigationPage::openDiagnostics(m_profile, QStringLiteral("chrome://tracing")); });
+    diagMenu->addSeparator();
+    diagMenu->addAction(tr("Clear profile data…"), this, [this] {
+        if (QMessageBox::question(this, tr("Clear profile"),
+                tr("This will delete all local data: cookies, session, "
+                   "IndexedDB, service workers, settings.\n"
+                   "Downloaded assets will also be removed and re-downloaded "
+                   "from the Snap Store on next launch.\n\n"
+                   "The application will restart with a fresh profile."))
+            != QMessageBox::Yes)
+            return;
 
+        // Hide tray before quit — otherwise MainWindow::closeEvent ignores
+        // the close and QApplication::quit() is cancelled.
+        if (m_tray)
+            m_tray->hide();
+        QProcess::startDetached(QApplication::applicationFilePath(),
+                                {QStringLiteral("--clear-profile")});
+        QApplication::quit();
+    });
     QMenu* viewMenu = menuBar()->addMenu(tr("&Zoom"));
     QAction* zoomLabel = viewMenu->addAction(tr("100 %"));
     zoomLabel->setEnabled(false);
