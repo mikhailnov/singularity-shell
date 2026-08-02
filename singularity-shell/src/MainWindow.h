@@ -3,6 +3,7 @@
 #include <QMainWindow>
 
 class QCloseEvent;
+class QSystemTrayIcon;
 class QWebEngineView;
 class QWebEngineProfile;
 class QLabel;
@@ -10,7 +11,8 @@ class NavigationPage;
 class PreloadBridge;
 
 // MainWindow — single main view hosting sg://renderer/index.html,
-// status indicator for background updates, About dialog, zoom shortcuts.
+// status indicator for background updates, About dialog, zoom shortcuts,
+// system tray with optional WebEngine suspension.
 // See qt-tz.md FR-6..FR-13, §6.6.
 class MainWindow : public QMainWindow
 {
@@ -35,10 +37,17 @@ protected:
 private:
     void buildMenus();
     void setZoom(double factor);
+    void createWebEngine();
+    void setupTray();
+    void suspendWebEngine();
+    void resumeWebEngine();
 
     QWebEngineView* m_view = nullptr;
     NavigationPage* m_page = nullptr;
     QWebEngineProfile* m_profile = nullptr;
+    PreloadBridge* m_bridge = nullptr;
     QLabel* m_updateStatus = nullptr;
+    QSystemTrayIcon* m_tray = nullptr;
+    QAction* m_quitAction = nullptr;  // File > Quit — behavior depends on tray
     QString m_assetVersion;
 };

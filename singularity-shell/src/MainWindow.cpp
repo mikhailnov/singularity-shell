@@ -6,6 +6,8 @@
 
 
 #include <QAction>
+#include <QMenu>
+#include <QSystemTrayIcon>
 #include <QApplication>
 #include <QCloseEvent>
 #include <QColor>
@@ -27,11 +29,31 @@ MainWindow::MainWindow(QWebEngineProfile* profile, PreloadBridge* bridge,
                        const QString& assetVersion, QWidget* parent)
     : QMainWindow(parent)
     , m_profile(profile)
+    , m_bridge(bridge)
     , m_assetVersion(assetVersion)
 {
     setWindowTitle(tr("Singularity"));
     resize(1280, 800);
 
+    createWebEngine();
+
+    // Non-intrusive update indicator in the status bar (FR-9: no popups).
+    m_updateStatus = new QLabel(this);
+    statusBar()->addPermanentWidget(m_updateStatus);
+    statusBar()->hide();
+
+    buildMenus();
+    setupTray();
+
+    // Restore geometry.
+    QSettings s(settingsPath(), QSettings::IniFormat);
+    const QByteArray geo = s.value(QStringLiteral("ui/geometry")).toByteArray();
+    if (!geo.isEmpty())
+        restoreGeometry(geo);
+}
+
+void MainWindow::createWebEngine()
+{
     const auto pageBg = []() -> QColor {
         const bool dark = QGuiApplication::styleHints()->colorScheme()
                           == Qt::ColorScheme::Dark;
@@ -39,7 +61,7 @@ MainWindow::MainWindow(QWebEngineProfile* profile, PreloadBridge* bridge,
     };
 
     m_view = new QWebEngineView(this);
-    m_page = new NavigationPage(profile, /*permissivePopups=*/false, bridge, m_view);
+    m_page = new NavigationPage(m_profile, /*permissivePopups=*/false, m_bridge, m_view);
     m_page->setBackgroundColor(pageBg());
     m_view->setPage(m_page);
     setCentralWidget(m_view);
@@ -57,23 +79,11 @@ MainWindow::MainWindow(QWebEngineProfile* profile, PreloadBridge* bridge,
             [](const QUrl& url) { QDesktopServices::openUrl(url); });
 
     // Bridge wiring (FR-7).
-    if (bridge)
-        bridge->installOn(m_page);
-
-    // Non-intrusive update indicator in the status bar (FR-9: no popups).
-    m_updateStatus = new QLabel(this);
-    statusBar()->addPermanentWidget(m_updateStatus);
-    statusBar()->hide();
+    if (m_bridge)
+        m_bridge->installOn(m_page);
 
     // Intercept zoom keys before QWebEngineView (Chromium) consumes them.
     m_view->installEventFilter(this);
-    buildMenus();
-
-    // Restore geometry.
-    QSettings s(settingsPath(), QSettings::IniFormat);
-    const QByteArray geo = s.value(QStringLiteral("ui/geometry")).toByteArray();
-    if (!geo.isEmpty())
-        restoreGeometry(geo);
 }
 
 void MainWindow::buildMenus()
@@ -81,9 +91,18 @@ void MainWindow::buildMenus()
     QMenu* appMenu = menuBar()->addMenu(tr("&File"));
     QAction* about = appMenu->addAction(tr("&About"), this, &MainWindow::showAbout);
     about->setMenuRole(QAction::AboutRole);
-    QAction* quit = appMenu->addAction(tr("&Quit"), qApp, &QApplication::quit);
-    quit->setShortcut(QKeySequence::Quit);
-    quit->setMenuRole(QAction::QuitRole);
+    QAction* hideAction = appMenu->addAction(tr("&Hide to tray"), this, [this] {
+        hide();
+        suspendWebEngine();
+    });
+    hideAction->setShortcut(QKeySequence(QStringLiteral("Ctrl+W")));
+    m_quitAction = appMenu->addAction(tr("&Quit"), this, [this] {
+        if (m_tray)
+            m_tray->hide();
+        QApplication::quit();
+    });
+    m_quitAction->setShortcut(QKeySequence::Quit);
+    m_quitAction->setMenuRole(QAction::QuitRole);
     QMenu* diagMenu = menuBar()->addMenu(tr("&Diagnostics"));
     diagMenu->addAction(tr("Force reload"), this, [this] {
         m_page->triggerAction(QWebEnginePage::ReloadAndBypassCache);
@@ -220,5 +239,88 @@ bool MainWindow::eventFilter(QObject* obj, QEvent* event)
 void MainWindow::closeEvent(QCloseEvent* event)
 {
     QSettings(settingsPath(), QSettings::IniFormat).setValue(QStringLiteral("ui/geometry"), saveGeometry());
-    QMainWindow::closeEvent(event);
+
+    if (m_tray && m_tray->isVisible()) {
+        hide();               // hide window first — required before freeze
+        suspendWebEngine();   // then freeze the page
+        event->ignore();
+    } else {
+        QMainWindow::closeEvent(event);
+    }
+}
+
+void MainWindow::setupTray()
+{
+    if (!QSystemTrayIcon::isSystemTrayAvailable())
+        return;
+
+    m_tray = new QSystemTrayIcon(this);
+    m_tray->setIcon(QIcon(QStringLiteral(":/tray-icon.svg")));
+    m_tray->setToolTip(tr("Singularity"));
+
+    auto* menu = new QMenu(this);
+    QAction* showAction = menu->addAction(QString(), this, [this] {
+        if (isVisible()) {
+            hide();
+            suspendWebEngine();
+        } else {
+            resumeWebEngine();
+            show();
+            raise();
+            activateWindow();
+        }
+    });
+    connect(menu, &QMenu::aboutToShow, this, [this, showAction] {
+        showAction->setText(isVisible() ? tr("&Hide") : tr("&Show"));
+    });
+    menu->addAction(tr("&About"), this, &MainWindow::showAbout);
+    menu->addSeparator();
+    menu->addAction(tr("&Quit"), qApp, &QApplication::quit);
+    m_tray->setContextMenu(menu);
+
+    connect(m_tray, &QSystemTrayIcon::activated, this,
+            [this](QSystemTrayIcon::ActivationReason reason) {
+        if (reason == QSystemTrayIcon::Trigger
+            || reason == QSystemTrayIcon::DoubleClick) {
+            if (isVisible()) {
+                hide();
+                suspendWebEngine();
+            } else {
+                resumeWebEngine();
+                show();
+                raise();
+                activateWindow();
+            }
+        }
+    });
+
+    m_tray->show();
+}
+
+void MainWindow::suspendWebEngine()
+{
+    if (!m_page)
+        return;
+
+    // Save zoom before freezing.
+    QSettings(settingsPath(), QSettings::IniFormat)
+        .setValue(QStringLiteral("ui/zoomFactor"), m_page->zoomFactor());
+
+    qInfo() << "tray: freezing page";
+    // Freeze the page: stops JS execution (timers, requestAnimationFrame, etc.)
+    // while keeping the page in memory for instant resume.
+#if QT_VERSION >= QT_VERSION_CHECK(6, 4, 0)
+    m_page->setLifecycleState(QWebEnginePage::LifecycleState::Frozen);
+#endif
+}
+
+void MainWindow::resumeWebEngine()
+{
+    if (!m_page)
+        return;
+
+    qInfo() << "tray: resuming page";
+#if QT_VERSION >= QT_VERSION_CHECK(6, 4, 0)
+    m_page->setLifecycleState(QWebEnginePage::LifecycleState::Active);
+#endif
 }

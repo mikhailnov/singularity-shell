@@ -89,6 +89,8 @@ int main(int argc, char* argv[])
     }
 
     QApplication app(argc, argv);
+    // Keep the application alive when the main window is hidden to tray.
+    app.setQuitOnLastWindowClosed(false);
 
     // --- Translations (qt-tz.md §6.9) -----------------------------------------
     // Qt's own dialogs first, then our strings.

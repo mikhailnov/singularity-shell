@@ -20,6 +20,10 @@ The offline javascript version from the Snap package is reused.
 
 ![Diagnostics menu](docs/img-ru/menu-diagnostics.png)
 
+When hidden to tray, JavaScript execution is frozen — **~0% CPU** load, instant resume when restored from tray!
+
+![tray](docs/img-ru/tray.png)
+
 ## Installation
 
 ### ROSA Linux, MOS/MosTech.OS
