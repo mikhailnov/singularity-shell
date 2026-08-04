@@ -34,6 +34,8 @@ public:
     void start();
     // Bootstrap mode (FR-10): run immediately, ignore the rate limit.
     void startImmediately();
+    // User-requested manual check (bypasses rate limit).
+    Q_INVOKABLE void checkForUpdates();
 
 private:
     bool m_bootstrap = false;

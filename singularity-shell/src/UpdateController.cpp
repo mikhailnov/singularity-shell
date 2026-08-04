@@ -1,6 +1,10 @@
 #include "UpdateController.h"
 
 #include "SettingsPath.h"
+#include <cerrno>
+#include <cstdio>
+#include <cstring>
+
 #include <QCryptographicHash>
 #include <QDateTime>
 #include <QDir>
@@ -51,6 +55,15 @@ void UpdateController::startImmediately()
 {
     m_bootstrap = true;
     m_timer->start(0);
+}
+
+void UpdateController::checkForUpdates()
+{
+    qCInfo(lcUpd) << "manual update check requested";
+    const bool wasBootstrap = m_bootstrap;
+    m_bootstrap = true;   // bypass rate limit
+    check();
+    m_bootstrap = wasBootstrap;
 }
 
 bool UpdateController::rateLimited() const
@@ -312,8 +325,14 @@ void UpdateController::onExtractFinished(int exitCode, int exitStatus)
     const QString linkNew = m_store->userRoot() + QStringLiteral("/current.new");
     const QString linkCur = m_store->userRoot() + QStringLiteral("/current");
     QFile::remove(linkNew);
-    if (!QFile::link(m_destDir, linkNew) || !QFile::rename(linkNew, linkCur)) {
-        fail(QStringLiteral("symlink switch failed"));
+    if (!QFile::link(m_destDir, linkNew)) {
+        fail(QStringLiteral("symlink switch failed: cannot create current.new"));
+        return;
+    }
+    if (::rename(qPrintable(linkNew), qPrintable(linkCur)) != 0) {
+        const auto err = errno;
+        fail(QStringLiteral("symlink switch failed: %1").arg(QString::fromLocal8Bit(strerror(err))));
+        QFile::remove(linkNew);
         return;
     }
 

@@ -28,6 +28,9 @@ public:
     void loadApp();        // sg://renderer/index.html
     void loadBootstrap();  // qrc bootstrap page (FR-10)
 
+signals:
+    void updateCheckRequested();
+
 public slots:
     void setUpdateStatus(const QString& text);
     void showAbout();

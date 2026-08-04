@@ -268,9 +268,11 @@ int main(int argc, char* argv[])
         using S = UpdateController::State;
         QString text;
         switch (s) {
+        case S::Checking:    text = MainWindow::tr("Checking for updates…"); break;
         case S::Downloading: text = MainWindow::tr("Downloading update %1…").arg(detail); break;
         case S::Verifying:   text = MainWindow::tr("Verifying update %1…").arg(detail); break;
         case S::Staged:      text = MainWindow::tr("Update %1 ready — active on next start").arg(detail); break;
+        case S::UpToDate:    text = MainWindow::tr("Already up to date"); break;
         case S::Failed:      text = {}; break;
         default: break;
         }
@@ -282,6 +284,8 @@ int main(int argc, char* argv[])
             window.setUpdateStatus(MainWindow::tr("Downloading update… %1%").arg(pct));
     });
     // Bootstrap only: once the first asset set is staged, load the app (FR-10).
+    QObject::connect(&window, &MainWindow::updateCheckRequested,
+                     &updater, &UpdateController::checkForUpdates);
     if (bootstrap) {
         QObject::connect(&updater, &UpdateController::versionStaged, &window,
                          [&window, &store, profile](const QString& version, const QString& dir) {

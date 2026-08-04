@@ -18,6 +18,8 @@
 
 #include <QKeyEvent>
 #include <QLabel>
+#include <QToolButton>
+
 #include <QProcess>
 #include <QTimer>
 
@@ -48,7 +50,14 @@ MainWindow::MainWindow(QWebEngineProfile* profile, PreloadBridge* bridge,
 
     // Non-intrusive update indicator in the status bar (FR-9: no popups).
     m_updateStatus = new QLabel(this);
+    auto* closeBtn = new QToolButton(this);
+    closeBtn->setText(QStringLiteral("×"));
+    closeBtn->setAutoRaise(true);
+    closeBtn->setCursor(Qt::PointingHandCursor);
+    closeBtn->setToolTip(tr("Hide status bar"));
+    connect(closeBtn, &QToolButton::clicked, statusBar(), &QStatusBar::hide);
     statusBar()->addPermanentWidget(m_updateStatus);
+    statusBar()->addWidget(closeBtn);
     statusBar()->hide();
 
     buildMenus();
@@ -151,6 +160,9 @@ void MainWindow::buildMenus()
         QProcess::startDetached(QApplication::applicationFilePath(),
                                 {QStringLiteral("--clear-profile")});
         QApplication::quit();
+    });
+    diagMenu->addAction(tr("Check for updates"), this, [this] {
+        emit updateCheckRequested();
     });
     QMenu* viewMenu = menuBar()->addMenu(tr("&Zoom"));
     QAction* zoomLabel = viewMenu->addAction(tr("100 %"));
