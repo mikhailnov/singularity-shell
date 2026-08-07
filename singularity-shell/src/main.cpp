@@ -264,15 +264,17 @@ int main(int argc, char* argv[])
     // --- Background updater (FR-9; silent, staged) ------------------------------
     UpdateController updater(&store, dataDir, helperScriptPath(), &app);
     QObject::connect(&updater, &UpdateController::stateChanged, &window,
-                     [&window](UpdateController::State s, const QString& detail) {
+                     [&updater, &window](UpdateController::State s, const QString& detail) {
         using S = UpdateController::State;
         QString text;
         switch (s) {
-        case S::Checking:    text = MainWindow::tr("Checking for updates…"); break;
-        case S::Downloading: text = MainWindow::tr("Downloading update %1…").arg(detail); break;
-        case S::Verifying:   text = MainWindow::tr("Verifying update %1…").arg(detail); break;
-        case S::Staged:      text = MainWindow::tr("Update %1 ready — active on next start").arg(detail); break;
-        case S::UpToDate:    text = MainWindow::tr("Already up to date"); break;
+        // Show only for user-triggered checks (not automatic background polls).
+        case S::Checking:    if (updater.isManualCheck()) text = MainWindow::tr("Checking for updates\u2026"); break;
+        case S::UpToDate:    if (updater.isManualCheck()) text = MainWindow::tr("Already up to date");         break;
+        // Always show: these mean an actual update is in progress or staged.
+        case S::Downloading: text = MainWindow::tr("Downloading update %1\u2026").arg(detail); break;
+        case S::Verifying:   text = MainWindow::tr("Verifying update %1\u2026").arg(detail);   break;
+        case S::Staged:      text = MainWindow::tr("Update %1 ready \u2014 active on next start").arg(detail); break;
         case S::Failed:      text = {}; break;
         default: break;
         }

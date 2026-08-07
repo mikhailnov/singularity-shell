@@ -36,9 +36,14 @@ public:
     void startImmediately();
     // User-requested manual check (bypasses rate limit).
     Q_INVOKABLE void checkForUpdates();
+    // True when the current check was triggered by the user (Diagnostics →
+    // Check for updates), not a silent background timer check.
+    bool isManualCheck() const { return m_manual; }
 
 private:
     bool m_bootstrap = false;
+    // Set by checkForUpdates(), cleared by the automatic timer path.
+    bool m_manual = false;
 signals:
     void stateChanged(UpdateController::State state, const QString& detail);
     // 0..100 during Downloading; -1 = indeterminate.

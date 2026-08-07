@@ -39,7 +39,10 @@ UpdateController::UpdateController(AssetStore* store, QString dataDir,
     m_nam = new QNetworkAccessManager(this);
     m_timer = new QTimer(this);
     m_timer->setSingleShot(true);
-    connect(m_timer, &QTimer::timeout, this, &UpdateController::check);
+    connect(m_timer, &QTimer::timeout, this, [this] {
+        m_manual = false;  // automatic background check → silent status bar
+        check();
+    });
 }
 
 void UpdateController::start()
@@ -62,6 +65,7 @@ void UpdateController::checkForUpdates()
     qCInfo(lcUpd) << "manual update check requested";
     const bool wasBootstrap = m_bootstrap;
     m_bootstrap = true;   // bypass rate limit
+    m_manual = true;      // user-triggered → show status bar feedback
     check();
     m_bootstrap = wasBootstrap;
 }
