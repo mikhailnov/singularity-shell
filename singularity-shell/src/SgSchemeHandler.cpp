@@ -155,8 +155,8 @@ void SgSchemeHandler::applyCors(QWebEngineUrlRequestJob* job)
 
 void SgSchemeHandler::proxyRequest(QWebEngineUrlRequestJob* job)
 {
-    const QUrl target = QUrlQuery(job->requestUrl())
-                            .queryItemValue(QStringLiteral("u"), QUrl::FullyDecoded);
+    QUrl target = QUrlQuery(job->requestUrl())
+                        .queryItemValue(QStringLiteral("u"), QUrl::FullyDecoded);
     const QByteArray method = job->requestMethod();
 
     // CORS preflight → approve.
@@ -192,6 +192,29 @@ void SgSchemeHandler::proxyRequest(QWebEngineUrlRequestJob* job)
                 qUtf8Printable(target.toString()));
         job->fail(QWebEngineUrlRequestJob::UrlInvalid);
         return;
+    }
+
+    // WORKAROUND: the vendor /ical/ endpoint returns HTTP 400 for
+    // calendar.360.yandex.ru (the same iCal feed is served from
+    // calendar.yandex.ru).  Rewrite the inner URL host while keeping
+    // everything else (path, query, token) intact.
+    {
+        QUrlQuery q(target);
+        const QString innerStr = q.queryItemValue(QStringLiteral("url"), QUrl::FullyDecoded);
+        if (!innerStr.isEmpty()) {
+            QUrl inner(innerStr);
+            if (inner.host() == QLatin1String("calendar.360.yandex.ru")) {
+                inner.setHost(QStringLiteral("calendar.yandex.ru"));
+                q.removeQueryItem(QStringLiteral("url"));
+                q.addQueryItem(QStringLiteral("url"), inner.toString());
+                target.setQuery(q);
+                // Always surface this rewrite — it is a deliberate behaviour
+                // change that must not be hidden when debugging with
+                // SINGULARITY_SHELL_LOG_REQUESTS=1.
+                if (NetLog::enabled())
+                    fprintf(stderr, "[sg-proxy] rewritten calendar.360.yandex.ru → calendar.yandex.ru in iCal URL\n");
+            }
+        }
     }
 
     if (NetLog::enabled())
